@@ -4,150 +4,175 @@
  * ==========================================
  * 
  * Ce fichier est le composant racine de l'app React Native.
- * Il configure:
- * - La navigation entre écrans
- * - Le thème visuel (couleurs, styles)
- * - Les providers (contextes globaux)
+ * Il gère:
+ * - L'authentification (AuthProvider)
+ * - La navigation conditionnelle (Auth vs App)
+ * - Le thème visuel
  * 
- * STRUCTURE DE NAVIGATION:
- * App
- * └── NavigationContainer (gère l'historique de navigation)
- *     └── Stack.Navigator (navigation par pile, comme un navigateur)
- *         ├── HomeScreen (écran d'accueil)
- *         ├── QuestScreen (détail d'une quête) - à venir
- *         ├── AvatarScreen (personnalisation) - à venir
- *         └── etc.
+ * FLUX DE NAVIGATION:
+ * 
+ * Non connecté:          Connecté:
+ * ┌─────────────┐        ┌─────────────┐
+ * │   Login     │        │    Home     │
+ * ├─────────────┤        ├─────────────┤
+ * │  Register   │        │   Avatar    │ (à venir)
+ * └─────────────┘        │   Stats     │ (à venir)
+ *                        │   Quests    │ (à venir)
+ *                        └─────────────┘
  */
 
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-// Nos composants et styles
+// Contexte d'authentification
+import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+
+// Écrans
 import HomeScreen from './src/screens/HomeScreen';
+import LoginScreen from './src/screens/LoginScreen';
+import RegisterScreen from './src/screens/RegisterScreen';
+
+// Thème
 import { colors } from './src/theme/colors';
 
 // ============================================
-// 📝 TYPES TYPESCRIPT - Définition des routes
+// 📝 TYPES DE NAVIGATION
 // ============================================
-// TypeScript a besoin de connaître les routes et leurs paramètres
-// Ça permet l'autocomplétion et évite les erreurs de typo
 
-export type RootStackParamList = {
-  // Home n'a pas de paramètres (undefined)
+// Stack pour les utilisateurs NON connectés
+export type AuthStackParamList = {
+  Login: undefined;
+  Register: undefined;
+};
+
+// Stack pour les utilisateurs connectés
+export type AppStackParamList = {
   Home: undefined;
-  
-  // Exemples pour les futures routes:
-  // Quest: { questId: string };      // ID de la quête à afficher
-  // Avatar: undefined;                // Pas de params
+  // Avatar: undefined;
   // Stats: undefined;
+  // Quest: { questId: string };
   // Settings: undefined;
 };
 
-// Crée le navigateur typé avec nos routes
-const Stack = createNativeStackNavigator<RootStackParamList>();
+// Crée les navigateurs
+const AuthStack = createNativeStackNavigator<AuthStackParamList>();
+const AppStack = createNativeStackNavigator<AppStackParamList>();
+
+// ============================================
+// 🔐 NAVIGATEUR AUTH (non connecté)
+// ============================================
+
+function AuthNavigator() {
+  return (
+    <AuthStack.Navigator
+      screenOptions={{
+        headerShown: false,  // Pas de header sur les écrans d'auth
+        contentStyle: {
+          backgroundColor: colors.background,
+        },
+      }}
+    >
+      <AuthStack.Screen name="Login" component={LoginScreen} />
+      <AuthStack.Screen name="Register" component={RegisterScreen} />
+    </AuthStack.Navigator>
+  );
+}
+
+// ============================================
+// 🏠 NAVIGATEUR APP (connecté)
+// ============================================
+
+function AppNavigator() {
+  return (
+    <AppStack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: colors.primary,
+        },
+        headerTintColor: colors.textLight,
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+        contentStyle: {
+          backgroundColor: colors.background,
+        },
+      }}
+    >
+      <AppStack.Screen 
+        name="Home" 
+        component={HomeScreen}
+        options={{
+          title: 'MyQuest',
+        }}
+      />
+      {/* TODO: Ajouter les écrans suivants
+      <AppStack.Screen name="Avatar" component={AvatarScreen} />
+      <AppStack.Screen name="Stats" component={StatsScreen} />
+      <AppStack.Screen name="Quest" component={QuestScreen} />
+      */}
+    </AppStack.Navigator>
+  );
+}
+
+// ============================================
+// 🔀 SÉLECTEUR DE NAVIGATION
+// ============================================
+// Affiche Auth ou App selon l'état de connexion
+
+function RootNavigator() {
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  // ── ÉCRAN DE CHARGEMENT ──
+  // Pendant qu'on vérifie si un token existe
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    );
+  }
+  
+  // ── NAVIGATION CONDITIONNELLE ──
+  // Si connecté → App, sinon → Auth
+  return isAuthenticated ? <AppNavigator /> : <AuthNavigator />;
+}
 
 // ============================================
 // 🎯 COMPOSANT PRINCIPAL
 // ============================================
+
 export default function App() {
   return (
-    // SafeAreaProvider: gère les zones sûres (notch, barre de status)
-    // Évite que le contenu soit caché sous la barre de notification
+    // SafeAreaProvider: gère les zones sûres (notch, etc.)
     <SafeAreaProvider>
-      
-      {/* NavigationContainer: contexte de navigation obligatoire */}
-      {/* Gère l'état de navigation (où on est, historique) */}
-      <NavigationContainer>
-        
-        {/* StatusBar: contrôle l'apparence de la barre de status */}
-        {/* style="light" = texte blanc (pour fond sombre) */}
-        <StatusBar style="light" />
-        
-        {/* Stack.Navigator: navigation "pile" (push/pop comme un browser) */}
-        <Stack.Navigator
-          // Écran affiché au lancement
-          initialRouteName="Home"
+      {/* AuthProvider: fournit le contexte d'auth à toute l'app */}
+      <AuthProvider>
+        {/* NavigationContainer: contexte de navigation */}
+        <NavigationContainer>
+          {/* StatusBar: style de la barre de status */}
+          <StatusBar style="light" />
           
-          // Options par défaut pour TOUS les écrans
-          screenOptions={{
-            // Style du header (barre du haut)
-            headerStyle: {
-              backgroundColor: colors.primary,  // Fond sombre
-            },
-            // Couleur du texte/icônes du header
-            headerTintColor: colors.textLight,  // Blanc
-            // Style du titre
-            headerTitleStyle: {
-              fontWeight: 'bold',
-            },
-            // Fond de l'écran (derrière le contenu)
-            contentStyle: {
-              backgroundColor: colors.background,
-            },
-          }}
-        >
-          {/* ── DÉFINITION DES ÉCRANS ── */}
-          
-          {/* Écran d'accueil */}
-          <Stack.Screen 
-            name="Home"                    // Nom de la route (pour navigation.navigate('Home'))
-            component={HomeScreen}         // Composant à afficher
-            options={{
-              title: 'MyQuest',            // Titre dans le header
-              headerLargeTitle: true,      // Grand titre iOS style
-            }}
-          />
-          
-          {/* TODO: Ajouter les écrans suivants:
-          
-          <Stack.Screen 
-            name="Quest" 
-            component={QuestScreen}
-            options={({ route }) => ({
-              title: route.params?.questTitle || 'Quête',
-            })}
-          />
-          
-          <Stack.Screen 
-            name="Avatar" 
-            component={AvatarScreen}
-            options={{ title: 'Mon Avatar' }}
-          />
-          
-          <Stack.Screen 
-            name="Stats" 
-            component={StatsScreen}
-            options={{ title: 'Mes Statistiques' }}
-          />
-          
-          */}
-          
-        </Stack.Navigator>
-      </NavigationContainer>
+          {/* Navigation principale */}
+          <RootNavigator />
+        </NavigationContainer>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }
 
 // ============================================
-// 📝 NOTES POUR LA SUITE
+// 🎨 STYLES
 // ============================================
-//
-// PROVIDERS À AJOUTER:
-// - AuthContext: état de connexion (user, token)
-// - ThemeContext: si on veut un mode clair/sombre
-// - QueryClientProvider: pour React Query (cache API)
-//
-// Exemple de structure avec providers:
-//
-// <SafeAreaProvider>
-//   <AuthProvider>
-//     <QueryClientProvider client={queryClient}>
-//       <NavigationContainer>
-//         ...
-//       </NavigationContainer>
-//     </QueryClientProvider>
-//   </AuthProvider>
-// </SafeAreaProvider>
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+});
