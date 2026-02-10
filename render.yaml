@@ -1,0 +1,117 @@
+# ==========================================
+# 🚀 RENDER BLUEPRINT - Infrastructure as Code
+# ==========================================
+#
+# Ce fichier définit l'infrastructure sur Render.com
+# Il crée automatiquement:
+# - Un service web (API backend)
+# - Une base de données PostgreSQL
+#
+# UTILISATION:
+# 1. Push ce repo sur GitHub
+# 2. Va sur dashboard.render.com
+# 3. New > Blueprint
+# 4. Connecte ton repo GitHub
+# 5. Render crée tout automatiquement!
+#
+# ALTERNATIVE MANUELLE:
+# Si tu préfères créer les services à la main,
+# voir le fichier RENDER-SETUP.md
+
+# ============================================
+# 🗄️ BASE DE DONNÉES POSTGRESQL
+# ============================================
+databases:
+  - name: myquest-db                    # Nom affiché dans Render
+    databaseName: myquest               # Nom de la base
+    user: myquest_user                  # Utilisateur DB
+    
+    # Plan: free = gratuit mais limité
+    # - 256 MB stockage
+    # - Expire après 90 jours sans activité
+    # Passer à "starter" ($7/mois) pour production
+    plan: free
+    
+    # Région: Frankfurt (plus proche de la Suisse)
+    region: frankfurt
+
+# ============================================
+# 🌐 SERVICE WEB - API BACKEND
+# ============================================
+services:
+  - type: web                           # Type de service
+    name: myquest-api                   # Nom affiché
+    runtime: node                       # Runtime Node.js
+    region: frankfurt                   # Même région que la DB
+    
+    # Plan gratuit: 750h/mois, sleep après 15min inactivité
+    plan: free
+    
+    # Dossier contenant le code backend
+    rootDir: backend
+    
+    # ── COMMANDES ──
+    # Build: installer deps + générer client Prisma + compiler TS
+    buildCommand: npm install && npx prisma generate && npm run build
+    
+    # Start: lancer le serveur compilé
+    startCommand: npm start
+    
+    # ── HEALTH CHECK ──
+    # Render ping cette URL pour vérifier que l'app est up
+    healthCheckPath: /health
+    
+    # ── VARIABLES D'ENVIRONNEMENT ──
+    envVars:
+      # NODE_ENV: production active les optimisations
+      - key: NODE_ENV
+        value: production
+      
+      # DATABASE_URL: Render injecte automatiquement l'URL de la DB
+      # Le "fromDatabase" lie ce service à la DB créée ci-dessus
+      - key: DATABASE_URL
+        fromDatabase:
+          name: myquest-db
+          property: connectionString
+      
+      # JWT_SECRET: clé secrète pour signer les tokens
+      # "generateValue: true" = Render génère une valeur aléatoire sécurisée
+      - key: JWT_SECRET
+        generateValue: true
+      
+      # PORT: Render définit automatiquement le port
+      # Pas besoin de le spécifier, on utilise process.env.PORT
+    
+    # ── AUTO-DEPLOY ──
+    # Redéploie automatiquement quand tu push sur main
+    autoDeploy: true
+    
+    # ── BRANCHE ──
+    # Quelle branche déclenche le déploiement
+    branch: main
+
+# ============================================
+# 📝 NOTES
+# ============================================
+#
+# APRÈS DÉPLOIEMENT:
+# 1. Va dans le dashboard Render
+# 2. Clique sur myquest-api
+# 3. Récupère l'URL (ex: https://myquest-api.onrender.com)
+# 4. Configure cette URL dans l'app frontend
+#
+# MIGRATIONS DB:
+# Les migrations ne sont pas auto-exécutées.
+# Pour la première fois:
+# 1. Va dans myquest-api > Shell
+# 2. Exécute: npx prisma migrate deploy
+#
+# LOGS:
+# Dashboard > myquest-api > Logs
+# Utile pour débugger les erreurs
+#
+# UPGRADE:
+# Pour passer en production:
+# - DB: Changer plan: free → plan: starter ($7/mois)
+# - API: Changer plan: free → plan: starter ($7/mois)
+# Le plan starter n'a pas de sleep et plus de ressources

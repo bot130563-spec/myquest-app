@@ -1,0 +1,113 @@
+# ==========================================
+# 🚫 GITIGNORE - Fichiers à ne pas committer
+# ==========================================
+
+# ============================================
+# 📦 DÉPENDANCES
+# ============================================
+# Les node_modules sont ÉNORMES et régénérables
+node_modules/
+.pnp
+.pnp.js
+
+# ============================================
+# 🔐 SECRETS & ENVIRONNEMENT
+# ============================================
+# JAMAIS committer ces fichiers!
+# Ils contiennent des mots de passe et clés secrètes
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+
+# ============================================
+# 🏗️ BUILD & COMPILATION
+# ============================================
+# Fichiers générés, régénérables
+dist/
+build/
+.next/
+out/
+
+# ============================================
+# 📱 EXPO / REACT NATIVE
+# ============================================
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# ============================================
+# 🗄️ PRISMA
+# ============================================
+# Le client Prisma est généré, pas besoin de le versionner
+# Mais on GARDE prisma/migrations/ (historique des migrations)
+
+# ============================================
+# 🍎 MACOS
+# ============================================
+.DS_Store
+*.DS_Store
+.AppleDouble
+.LSOverride
+
+# ============================================
+# 🪟 WINDOWS
+# ============================================
+Thumbs.db
+ehthumbs.db
+
+# ============================================
+# 💻 ÉDITEURS & IDE
+# ============================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+
+# ============================================
+# 📊 LOGS & DEBUG
+# ============================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# ============================================
+# 🧪 TESTS
+# ============================================
+coverage/
+.nyc_output/
+*.lcov
+
+# ============================================
+# ⚡ CACHE
+# ============================================
+.cache/
+.parcel-cache/
+.npm/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# ============================================
+# 📝 TEMP
+# ============================================
+tmp/
+temp/
+*.tmp
+*.temp

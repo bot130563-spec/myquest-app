@@ -1,0 +1,191 @@
+// ==========================================
+// 🗃️ MYQUEST - SCHÉMA DE BASE DE DONNÉES
+// ==========================================
+//
+// Ce fichier définit la structure de notre base PostgreSQL.
+// Prisma utilise ce schéma pour:
+// - Créer/modifier les tables (migrations)
+// - Générer le client TypeScript typé
+//
+// COMMANDES UTILES:
+// - npx prisma migrate dev    → Crée une migration + applique
+// - npx prisma db push        → Applique sans créer de migration (dev)
+// - npx prisma studio         → Interface web pour voir les données
+// - npx prisma generate       → Régénère le client après modif
+//
+// RELATIONS:
+// User ←──┬──→ Avatar  (1:1 - chaque user a UN avatar)
+//         └──→ Stats   (1:1 - chaque user a UNE ligne de stats)
+
+// ============================================
+// ⚙️ CONFIGURATION PRISMA
+// ============================================
+
+// Generator: crée le client TypeScript
+// Après "npx prisma generate", on peut faire:
+// import { PrismaClient } from '@prisma/client'
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Datasource: connexion à la base de données
+// DATABASE_URL est définie dans .env (ou variable Render)
+// Format: postgresql://USER:PASSWORD@HOST:PORT/DATABASE
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// 👤 MODEL USER - Compte utilisateur
+// ============================================
+// Stocke les informations de connexion et identité
+// C'est la table "maître" - Avatar et Stats y sont liés
+
+model User {
+  // ID unique généré automatiquement (format: cuid - compact unique id)
+  // Exemple: "clh1234567890abcdef"
+  id        String   @id @default(cuid())
+  
+  // Email de connexion - UNIQUE = pas de doublons possibles
+  email     String   @unique
+  
+  // Mot de passe HASHÉ (jamais en clair!)
+  // On utilisera bcrypt pour hasher
+  password  String
+  
+  // Nom d'affichage (optionnel avec ?)
+  name      String?
+  
+  // Dates de création/modification automatiques
+  createdAt DateTime @default(now())    // now() = date actuelle à la création
+  updatedAt DateTime @updatedAt         // @updatedAt = màj auto à chaque save
+
+  // ── RELATIONS ──
+  // Un user a UN avatar (relation 1:1)
+  // Le ? signifie que l'avatar peut ne pas encore exister
+  avatar Avatar?
+  
+  // Un user a UNE ligne de stats (relation 1:1)
+  stats  Stats?
+
+  // @@map renomme la table en "users" (convention: pluriel, minuscule)
+  @@map("users")
+}
+
+// ============================================
+// 🦸 MODEL AVATAR - Personnage du joueur
+// ============================================
+// L'avatar représente le "personnage" de l'utilisateur dans le jeu
+// Il gagne de l'XP, monte de niveau, peut être personnalisé
+
+model Avatar {
+  id          String   @id @default(cuid())
+  
+  // Clé étrangère vers User
+  // @unique car relation 1:1 (un user = un avatar max)
+  userId      String   @unique
+  
+  // Relation: lie cet avatar à un User
+  // onDelete: Cascade = si on supprime le User, l'Avatar est supprimé aussi
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // ── PROGRESSION ──
+  // Nom du personnage choisi par l'utilisateur
+  name        String   @default("Hero")
+  
+  // Niveau actuel (commence à 1)
+  // Monte quand l'utilisateur atteint des paliers d'XP
+  level       Int      @default(1)
+  
+  // Points d'expérience actuels
+  // Ex: 100 XP pour niveau 2, 250 pour niveau 3, etc.
+  experience  Int      @default(0)
+  
+  // Type d'avatar (pour l'apparence/classe)
+  // "warrior", "mage", "healer", "rogue", etc.
+  avatarType  String   @default("warrior")
+  
+  // ── PERSONNALISATION ──
+  // JSON flexible pour stocker l'apparence
+  // Ex: { "hair": "black", "skin": "light", "outfit": "armor1" }
+  // On utilise Json car la structure peut évoluer sans migration
+  appearance  Json     @default("{}")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("avatars")
+}
+
+// ============================================
+// 📊 MODEL STATS - Statistiques de vie
+// ============================================
+// Les stats représentent les différents aspects de la vie
+// de l'utilisateur, façon jeu de rôle (0-100 pour chaque)
+
+model Stats {
+  id        String   @id @default(cuid())
+  
+  // Lien vers l'utilisateur (1:1)
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // ── STATS PRINCIPALES (échelle 0-100) ──
+  
+  // 💪 HEALTH - Santé physique
+  // Augmente: sport, sommeil, alimentation saine
+  // Diminue: maladie, mauvaises habitudes
+  health    Int      @default(50)
+  
+  // ⚡ ENERGY - Énergie mentale / motivation
+  // Augmente: accomplissements, repos, méditation
+  // Diminue: stress, surmenage, procrastination
+  energy    Int      @default(50)
+  
+  // 📚 WISDOM - Connaissances & apprentissage
+  // Augmente: lecture, cours, apprentissage de skills
+  // Diminue: stagnation (décroit lentement si pas actif)
+  wisdom    Int      @default(50)
+  
+  // 👥 SOCIAL - Relations & connexions
+  // Augmente: sorties, appels, aider les autres
+  // Diminue: isolation, conflits
+  social    Int      @default(50)
+  
+  // 💰 WEALTH - Santé financière
+  // Augmente: épargne, investissement, revenus
+  // Diminue: dépenses excessives, dettes
+  wealth    Int      @default(50)
+  
+  // ── STREAKS (séries consécutives) ──
+  
+  // Nombre de jours consécutifs avec activité
+  // Se remet à 0 si l'utilisateur skip un jour
+  currentStreak Int  @default(0)
+  
+  // Record personnel de streak
+  // Utile pour les achievements "streak de 30 jours"
+  longestStreak Int  @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("stats")
+}
+
+// ============================================
+// 📝 NOTES POUR ÉVOLUTIONS FUTURES
+// ============================================
+//
+// TABLES À AJOUTER:
+// - Quest: les quêtes/défis que l'utilisateur peut accomplir
+// - Habit: les habitudes récurrentes (quotidiennes, hebdo)
+// - Achievement: les succès débloqués
+// - JournalEntry: entrées de journal/introspection
+// - Reward: récompenses cosmétiques pour l'avatar
+//
+// Pour ajouter un model:
+// 1. Définir le model ici
+// 2. npx prisma migrate dev --name "add_quests_table"
+// 3. Le client est auto-généré
