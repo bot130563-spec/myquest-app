@@ -23,9 +23,10 @@
 
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Contexte d'authentification
@@ -54,14 +55,19 @@ export type AuthStackParamList = {
   Register: undefined;
 };
 
-// Stack pour les utilisateurs connectés
-export type AppStackParamList = {
+// Tabs pour la navigation principale
+export type MainTabParamList = {
   Dashboard: undefined;
   Quests: undefined;
-  CreateQuest: undefined;
-  Habits: undefined;
-  CreateHabit: undefined;
   Journal: undefined;
+  Habits: undefined;
+};
+
+// Stack pour les utilisateurs connectés (inclut les tabs + modals)
+export type AppStackParamList = {
+  MainTabs: undefined;
+  CreateQuest: undefined;
+  CreateHabit: undefined;
   // Avatar: undefined;
   // Settings: undefined;
 };
@@ -69,6 +75,7 @@ export type AppStackParamList = {
 // Crée les navigateurs
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const AppStack = createNativeStackNavigator<AppStackParamList>();
+const MainTab = createBottomTabNavigator<MainTabParamList>();
 
 // ============================================
 // 🔐 NAVIGATEUR AUTH (non connecté)
@@ -87,6 +94,83 @@ function AuthNavigator() {
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Register" component={RegisterScreen} />
     </AuthStack.Navigator>
+  );
+}
+
+// ============================================
+// 📱 NAVIGATEUR TABS (onglets principaux)
+// ============================================
+
+function MainTabNavigator() {
+  return (
+    <MainTab.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: colors.primary,
+        },
+        headerTintColor: colors.textLight,
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: '#999',
+        tabBarStyle: {
+          paddingBottom: 8,
+          paddingTop: 8,
+          height: 60,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '500',
+        },
+      }}
+    >
+      <MainTab.Screen 
+        name="Dashboard" 
+        component={DashboardScreen}
+        options={{
+          title: 'Accueil',
+          headerTitle: 'MyQuest',
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 22 }}>🏠</Text>
+          ),
+        }}
+      />
+      <MainTab.Screen 
+        name="Quests" 
+        component={QuestsScreen}
+        options={{
+          title: 'Quêtes',
+          headerTitle: 'Mes Quêtes',
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 22 }}>⚔️</Text>
+          ),
+        }}
+      />
+      <MainTab.Screen 
+        name="Journal" 
+        component={JournalScreen}
+        options={{
+          title: 'Journal',
+          headerTitle: 'Mon Journal',
+          headerShown: false, // Le JournalScreen a son propre header
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 22 }}>📓</Text>
+          ),
+        }}
+      />
+      <MainTab.Screen 
+        name="Habits" 
+        component={HabitsScreen}
+        options={{
+          title: 'Habitudes',
+          headerTitle: 'Mes Habitudes',
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 22 }}>🔄</Text>
+          ),
+        }}
+      />
+    </MainTab.Navigator>
   );
 }
 
@@ -111,17 +195,10 @@ function AppNavigator() {
       }}
     >
       <AppStack.Screen 
-        name="Dashboard" 
-        component={DashboardScreen}
+        name="MainTabs" 
+        component={MainTabNavigator}
         options={{
-          title: 'MyQuest',
-        }}
-      />
-      <AppStack.Screen 
-        name="Quests" 
-        component={QuestsScreen}
-        options={{
-          title: 'Mes Quêtes',
+          headerShown: false, // Les tabs ont leur propre header
         }}
       />
       <AppStack.Screen 
@@ -133,25 +210,11 @@ function AppNavigator() {
         }}
       />
       <AppStack.Screen 
-        name="Habits" 
-        component={HabitsScreen}
-        options={{
-          title: 'Mes Habitudes',
-        }}
-      />
-      <AppStack.Screen 
         name="CreateHabit" 
         component={CreateHabitScreen}
         options={{
           title: 'Nouvelle Habitude',
           presentation: 'modal',
-        }}
-      />
-      <AppStack.Screen 
-        name="Journal" 
-        component={JournalScreen}
-        options={{
-          title: 'Mon Journal',
         }}
       />
       {/* TODO: Ajouter les écrans suivants
