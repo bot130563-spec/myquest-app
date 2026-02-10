@@ -25,6 +25,8 @@ import authRoutes from './auth';
 import userRoutes from './user';
 import questRoutes from './quest';
 import habitRoutes from './habit';
+import journalRoutes from './journal';
+import dashboardRoutes from './dashboard';
 
 const router = Router();
 
@@ -124,5 +126,11 @@ router.use('/quests', questRoutes);
 
 // Routes habitudes: /api/habits/*
 router.use('/habits', habitRoutes);
+
+// Routes journal: /api/journal/*
+router.use('/journal', journalRoutes);
+
+// Routes dashboard: /api/dashboard
+router.use('/dashboard', dashboardRoutes);
 
 export default router;

@@ -74,6 +74,9 @@ model User {
   
   // Un user a PLUSIEURS habitudes (relation 1:N)
   habits Habit[]
+  
+  // Un user a PLUSIEURS entrées de journal (relation 1:N)
+  journalEntries JournalEntry[]
 
   // @@map renomme la table en "users" (convention: pluriel, minuscule)
   @@map("users")
@@ -341,3 +344,57 @@ enum HabitFrequency {
   WEEKDAYS    // Lun-Ven seulement
   WEEKENDS    // Sam-Dim seulement
 }
+
+// ============================================
+// 📓 MODEL JOURNALENTRY - Journal personnel
+// ============================================
+// Entrées de journal pour l'introspection quotidienne.
+// Permet de réfléchir sur ses émotions, gratitudes, objectifs.
+
+model JournalEntry {
+  id          String   @id @default(cuid())
+  
+  // Lien vers l'utilisateur
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // ── DATE ──
+  // Date de l'entrée (une entrée par jour max)
+  entryDate   DateTime @db.Date
+  
+  // ── CONTENU ──
+  // Humeur du jour (1-5)
+  mood        Int      @default(3)
+  
+  // Texte principal du journal
+  content     String?  @db.Text
+  
+  // Gratitudes (stockées en JSON pour flexibilité)
+  // Ex: ["Ma famille", "Le beau temps", "Un bon café"]
+  gratitudes  Json     @default("[]")
+  
+  // Objectif du jour
+  dailyGoal   String?
+  
+  // Réflexion/leçon apprise
+  reflection  String?  @db.Text
+  
+  // Tags/thèmes (JSON array)
+  tags        Json     @default("[]")
+  
+  // ── RÉCOMPENSE ──
+  // Écrire dans son journal donne un petit bonus XP
+  xpAwarded   Boolean  @default(false)
+  
+  // ── TIMESTAMPS ──
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("journal_entries")
+  // Une seule entrée par jour par utilisateur
+  @@unique([userId, entryDate])
+  @@index([userId, entryDate])
+}
+
+// ── ENUM MOOD ──
+// Note: On utilise Int (1-5) plutôt qu'un enum pour plus de flexibilité

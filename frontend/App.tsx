@@ -32,13 +32,14 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 
 // Écrans
-import HomeScreen from './src/screens/HomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
+import DashboardScreen from './src/screens/DashboardScreen';
 import QuestsScreen from './src/screens/QuestsScreen';
 import CreateQuestScreen from './src/screens/CreateQuestScreen';
 import HabitsScreen from './src/screens/HabitsScreen';
 import CreateHabitScreen from './src/screens/CreateHabitScreen';
+import JournalScreen from './src/screens/JournalScreen';
 
 // Thème
 import { colors } from './src/theme/colors';
@@ -55,13 +56,13 @@ export type AuthStackParamList = {
 
 // Stack pour les utilisateurs connectés
 export type AppStackParamList = {
-  Home: undefined;
+  Dashboard: undefined;
   Quests: undefined;
   CreateQuest: undefined;
   Habits: undefined;
   CreateHabit: undefined;
+  Journal: undefined;
   // Avatar: undefined;
-  // Stats: undefined;
   // Settings: undefined;
 };
 
@@ -110,8 +111,8 @@ function AppNavigator() {
       }}
     >
       <AppStack.Screen 
-        name="Home" 
-        component={HomeScreen}
+        name="Dashboard" 
+        component={DashboardScreen}
         options={{
           title: 'MyQuest',
         }}
@@ -146,9 +147,16 @@ function AppNavigator() {
           presentation: 'modal',
         }}
       />
+      <AppStack.Screen 
+        name="Journal" 
+        component={JournalScreen}
+        options={{
+          title: 'Mon Journal',
+        }}
+      />
       {/* TODO: Ajouter les écrans suivants
       <AppStack.Screen name="Avatar" component={AvatarScreen} />
-      <AppStack.Screen name="Stats" component={StatsScreen} />
+      <AppStack.Screen name="Settings" component={SettingsScreen} />
       */}
     </AppStack.Navigator>
   );
