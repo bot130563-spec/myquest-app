@@ -23,6 +23,7 @@
 import { Router, Request, Response } from 'express';
 import authRoutes from './auth';
 import userRoutes from './user';
+import questRoutes from './quest';
 
 const router = Router();
 
@@ -116,5 +117,8 @@ router.use('/auth', authRoutes);
 
 // Routes utilisateur: /api/user/*
 router.use('/user', userRoutes);
+
+// Routes quêtes: /api/quests/*
+router.use('/quests', questRoutes);
 
 export default router;

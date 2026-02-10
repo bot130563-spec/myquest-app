@@ -35,6 +35,8 @@ import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import HomeScreen from './src/screens/HomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
+import QuestsScreen from './src/screens/QuestsScreen';
+import CreateQuestScreen from './src/screens/CreateQuestScreen';
 
 // Thème
 import { colors } from './src/theme/colors';
@@ -52,9 +54,10 @@ export type AuthStackParamList = {
 // Stack pour les utilisateurs connectés
 export type AppStackParamList = {
   Home: undefined;
+  Quests: undefined;
+  CreateQuest: undefined;
   // Avatar: undefined;
   // Stats: undefined;
-  // Quest: { questId: string };
   // Settings: undefined;
 };
 
@@ -109,10 +112,24 @@ function AppNavigator() {
           title: 'MyQuest',
         }}
       />
+      <AppStack.Screen 
+        name="Quests" 
+        component={QuestsScreen}
+        options={{
+          title: 'Mes Quêtes',
+        }}
+      />
+      <AppStack.Screen 
+        name="CreateQuest" 
+        component={CreateQuestScreen}
+        options={{
+          title: 'Nouvelle Quête',
+          presentation: 'modal',
+        }}
+      />
       {/* TODO: Ajouter les écrans suivants
       <AppStack.Screen name="Avatar" component={AvatarScreen} />
       <AppStack.Screen name="Stats" component={StatsScreen} />
-      <AppStack.Screen name="Quest" component={QuestScreen} />
       */}
     </AppStack.Navigator>
   );

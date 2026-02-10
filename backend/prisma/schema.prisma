@@ -68,6 +68,9 @@ model User {
   
   // Un user a UNE ligne de stats (relation 1:1)
   stats  Stats?
+  
+  // Un user a PLUSIEURS quêtes (relation 1:N)
+  quests Quest[]
 
   // @@map renomme la table en "users" (convention: pluriel, minuscule)
   @@map("users")
@@ -175,17 +178,77 @@ model Stats {
 }
 
 // ============================================
-// 📝 NOTES POUR ÉVOLUTIONS FUTURES
+// ⚔️ MODEL QUEST - Quêtes et défis
 // ============================================
-//
-// TABLES À AJOUTER:
-// - Quest: les quêtes/défis que l'utilisateur peut accomplir
-// - Habit: les habitudes récurrentes (quotidiennes, hebdo)
-// - Achievement: les succès débloqués
-// - JournalEntry: entrées de journal/introspection
-// - Reward: récompenses cosmétiques pour l'avatar
-//
-// Pour ajouter un model:
-// 1. Définir le model ici
-// 2. npx prisma migrate dev --name "add_quests_table"
-// 3. Le client est auto-généré
+// Une quête est un objectif que l'utilisateur se fixe.
+// Compléter une quête donne de l'XP et peut modifier les stats.
+
+model Quest {
+  id          String   @id @default(cuid())
+  
+  // Lien vers l'utilisateur propriétaire
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // ── INFORMATIONS DE BASE ──
+  title       String              // "Faire 30 min de sport"
+  description String?             // Description détaillée (optionnel)
+  
+  // ── CATÉGORIE ──
+  // Lié à quelle stat? Permet de savoir quelle stat augmenter
+  category    QuestCategory @default(GENERAL)
+  
+  // ── DIFFICULTÉ & RÉCOMPENSES ──
+  // Plus c'est difficile, plus ça rapporte
+  difficulty  QuestDifficulty @default(MEDIUM)
+  xpReward    Int             @default(25)    // XP gagnés à la complétion
+  statBoost   Int             @default(2)     // Points de stat gagnés
+  
+  // ── ÉTAT ──
+  status      QuestStatus @default(ACTIVE)
+  
+  // ── ÉCHÉANCE (optionnel) ──
+  dueDate     DateTime?           // Date limite
+  
+  // ── TIMESTAMPS ──
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  completedAt DateTime?           // Quand la quête a été complétée
+
+  @@map("quests")
+  // Index pour récupérer rapidement les quêtes d'un user
+  @@index([userId, status])
+}
+
+// ── ENUMS ──
+
+// Catégories de quêtes (liées aux stats)
+enum QuestCategory {
+  HEALTH    // 💪 Santé physique
+  ENERGY    // ⚡ Énergie mentale, motivation
+  WISDOM    // 📚 Apprentissage, lecture
+  SOCIAL    // 👥 Relations, sorties
+  WEALTH    // 💰 Finances, travail
+  GENERAL   // ⭐ Général (pas de stat spécifique)
+}
+
+// Niveaux de difficulté
+enum QuestDifficulty {
+  EASY      // Facile: 15 XP, +1 stat
+  MEDIUM    // Moyen: 25 XP, +2 stat
+  HARD      // Difficile: 50 XP, +5 stat
+  EPIC      // Épique: 100 XP, +10 stat
+}
+
+// États d'une quête
+enum QuestStatus {
+  ACTIVE      // En cours
+  COMPLETED   // Terminée avec succès
+  FAILED      // Échouée (deadline passée)
+  ABANDONED   // Abandonnée par l'utilisateur
+}
+
+// ============================================
+// 📝 MISE À JOUR DU MODEL USER
+// ============================================
+// Ajouter la relation vers Quest

@@ -23,14 +23,23 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
 import { useAuth } from '../contexts/AuthContext';
+
+// ============================================
+// 📦 TYPES
+// ============================================
+
+type HomeScreenProps = {
+  navigation: NativeStackNavigationProp<any>;
+};
 
 // ============================================
 // 🎯 COMPOSANT PRINCIPAL
 // ============================================
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }: HomeScreenProps) {
   // Récupère les données utilisateur depuis le contexte
   const { user, logout } = useAuth();
   
@@ -155,16 +164,22 @@ export default function HomeScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>🎯 Actions Rapides</Text>
           
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('CreateQuest')}
+          >
             <Text style={styles.actionButtonText}>+ Nouvelle Quête</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.secondaryButton]}
+            onPress={() => navigation.navigate('Quests')}
+          >
+            <Text style={styles.secondaryButtonText}>⚔️ Voir mes Quêtes</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]}>
             <Text style={styles.secondaryButtonText}>🦸 Personnaliser l'Avatar</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]}>
-            <Text style={styles.secondaryButtonText}>📓 Journal de bord</Text>
           </TouchableOpacity>
         </View>
 
