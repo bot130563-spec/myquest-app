@@ -37,6 +37,8 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import QuestsScreen from './src/screens/QuestsScreen';
 import CreateQuestScreen from './src/screens/CreateQuestScreen';
+import HabitsScreen from './src/screens/HabitsScreen';
+import CreateHabitScreen from './src/screens/CreateHabitScreen';
 
 // Thème
 import { colors } from './src/theme/colors';
@@ -56,6 +58,8 @@ export type AppStackParamList = {
   Home: undefined;
   Quests: undefined;
   CreateQuest: undefined;
+  Habits: undefined;
+  CreateHabit: undefined;
   // Avatar: undefined;
   // Stats: undefined;
   // Settings: undefined;
@@ -124,6 +128,21 @@ function AppNavigator() {
         component={CreateQuestScreen}
         options={{
           title: 'Nouvelle Quête',
+          presentation: 'modal',
+        }}
+      />
+      <AppStack.Screen 
+        name="Habits" 
+        component={HabitsScreen}
+        options={{
+          title: 'Mes Habitudes',
+        }}
+      />
+      <AppStack.Screen 
+        name="CreateHabit" 
+        component={CreateHabitScreen}
+        options={{
+          title: 'Nouvelle Habitude',
           presentation: 'modal',
         }}
       />

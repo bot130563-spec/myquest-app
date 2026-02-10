@@ -24,6 +24,7 @@ import { Router, Request, Response } from 'express';
 import authRoutes from './auth';
 import userRoutes from './user';
 import questRoutes from './quest';
+import habitRoutes from './habit';
 
 const router = Router();
 
@@ -120,5 +121,8 @@ router.use('/user', userRoutes);
 
 // Routes quêtes: /api/quests/*
 router.use('/quests', questRoutes);
+
+// Routes habitudes: /api/habits/*
+router.use('/habits', habitRoutes);
 
 export default router;

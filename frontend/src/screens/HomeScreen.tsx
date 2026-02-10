@@ -166,20 +166,23 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={() => navigation.navigate('CreateQuest')}
+            onPress={() => navigation.navigate('Habits')}
           >
-            <Text style={styles.actionButtonText}>+ Nouvelle Quête</Text>
+            <Text style={styles.actionButtonText}>🔄 Habitudes du jour</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={[styles.actionButton, styles.secondaryButton]}
             onPress={() => navigation.navigate('Quests')}
           >
-            <Text style={styles.secondaryButtonText}>⚔️ Voir mes Quêtes</Text>
+            <Text style={styles.secondaryButtonText}>⚔️ Mes Quêtes</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]}>
-            <Text style={styles.secondaryButtonText}>🦸 Personnaliser l'Avatar</Text>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.secondaryButton]}
+            onPress={() => navigation.navigate('CreateQuest')}
+          >
+            <Text style={styles.secondaryButtonText}>+ Nouvelle Quête</Text>
           </TouchableOpacity>
         </View>
 

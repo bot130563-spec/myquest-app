@@ -71,6 +71,9 @@ model User {
   
   // Un user a PLUSIEURS quêtes (relation 1:N)
   quests Quest[]
+  
+  // Un user a PLUSIEURS habitudes (relation 1:N)
+  habits Habit[]
 
   // @@map renomme la table en "users" (convention: pluriel, minuscule)
   @@map("users")
@@ -249,6 +252,92 @@ enum QuestStatus {
 }
 
 // ============================================
-// 📝 MISE À JOUR DU MODEL USER
+// 🔄 MODEL HABIT - Habitudes récurrentes
 // ============================================
-// Ajouter la relation vers Quest
+// Une habitude est une action répétée régulièrement.
+// Contrairement aux quêtes (one-shot), les habitudes se réinitialisent.
+
+model Habit {
+  id          String   @id @default(cuid())
+  
+  // Lien vers l'utilisateur
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // ── INFORMATIONS DE BASE ──
+  title       String              // "Méditer 10 minutes"
+  description String?             // Description optionnelle
+  icon        String   @default("⭐")  // Emoji pour affichage
+  
+  // ── CATÉGORIE (même que quêtes) ──
+  category    QuestCategory @default(GENERAL)
+  
+  // ── FRÉQUENCE ──
+  frequency   HabitFrequency @default(DAILY)
+  
+  // Pour WEEKLY: quels jours? (stocké en JSON: [1,3,5] = Lun, Mer, Ven)
+  // 0=Dim, 1=Lun, 2=Mar, 3=Mer, 4=Jeu, 5=Ven, 6=Sam
+  targetDays  Json     @default("[]")
+  
+  // Combien de fois par période? (ex: 3 fois par semaine)
+  targetCount Int      @default(1)
+  
+  // ── RÉCOMPENSES (plus petites que les quêtes car récurrentes) ──
+  xpReward    Int      @default(10)   // XP par complétion
+  statBoost   Int      @default(1)    // Stat boost par complétion
+  
+  // ── ÉTAT ──
+  isActive    Boolean  @default(true)  // Habitude activée?
+  
+  // ── PROGRESSION ──
+  currentStreak   Int  @default(0)    // Jours consécutifs
+  longestStreak   Int  @default(0)    // Record personnel
+  totalCompletions Int @default(0)    // Total depuis création
+  
+  // ── TIMESTAMPS ──
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Logs de complétion
+  logs        HabitLog[]
+
+  @@map("habits")
+  @@index([userId, isActive])
+}
+
+// ============================================
+// 📋 MODEL HABITLOG - Historique des complétions
+// ============================================
+// Chaque fois qu'une habitude est complétée, on crée un log.
+// Permet de voir l'historique et calculer les streaks.
+
+model HabitLog {
+  id          String   @id @default(cuid())
+  
+  // Lien vers l'habitude
+  habitId     String
+  habit       Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  
+  // Date de complétion (sans l'heure, pour grouper par jour)
+  completedDate DateTime @db.Date
+  
+  // Heure exacte de complétion
+  completedAt   DateTime @default(now())
+  
+  // Note optionnelle
+  note        String?
+
+  @@map("habit_logs")
+  // Un seul log par habitude par jour
+  @@unique([habitId, completedDate])
+  @@index([habitId, completedDate])
+}
+
+// ── ENUM FRÉQUENCE ──
+
+enum HabitFrequency {
+  DAILY       // Tous les jours
+  WEEKLY      // Certains jours de la semaine
+  WEEKDAYS    // Lun-Ven seulement
+  WEEKENDS    // Sam-Dim seulement
+}
