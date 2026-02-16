@@ -41,6 +41,7 @@ import CreateQuestScreen from './src/screens/CreateQuestScreen';
 import HabitsScreen from './src/screens/HabitsScreen';
 import CreateHabitScreen from './src/screens/CreateHabitScreen';
 import JournalScreen from './src/screens/JournalScreen';
+import CoachScreen from './src/screens/CoachScreen';
 
 // Thème
 import { colors } from './src/theme/colors';
@@ -59,6 +60,7 @@ export type AuthStackParamList = {
 export type MainTabParamList = {
   Dashboard: undefined;
   Quests: undefined;
+  Coach: undefined;
   Journal: undefined;
   Habits: undefined;
 };
@@ -144,6 +146,18 @@ function MainTabNavigator() {
           headerTitle: 'Mes Quêtes',
           tabBarIcon: ({ focused }) => (
             <Text style={{ fontSize: 22 }}>⚔️</Text>
+          ),
+        }}
+      />
+      <MainTab.Screen 
+        name="Coach" 
+        component={CoachScreen}
+        options={{
+          title: 'Coach',
+          headerTitle: 'Coach IA',
+          headerShown: false,
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 22 }}>🤖</Text>
           ),
         }}
       />

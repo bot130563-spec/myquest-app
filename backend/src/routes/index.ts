@@ -27,6 +27,7 @@ import questRoutes from './quest';
 import habitRoutes from './habit';
 import journalRoutes from './journal';
 import dashboardRoutes from './dashboard';
+import coachRoutes from './coach';
 
 const router = Router();
 
@@ -132,5 +133,8 @@ router.use('/journal', journalRoutes);
 
 // Routes dashboard: /api/dashboard
 router.use('/dashboard', dashboardRoutes);
+
+// Routes coach IA: /api/coach/*
+router.use('/coach', coachRoutes);
 
 export default router;
