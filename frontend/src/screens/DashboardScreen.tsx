@@ -22,7 +22,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
-import { API_URL } from '../config';
+import { api } from '../config/api';
 
 // Icônes pour les statistiques
 const STAT_CONFIG = {
@@ -41,7 +41,7 @@ export default function DashboardScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
-  const { token, user } = useAuth();
+  const { user } = useAuth();
 
   // Charger les données au montage
   useEffect(() => {
@@ -53,14 +53,8 @@ export default function DashboardScreen({ navigation }: any) {
    */
   const loadDashboard = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/dashboard`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setDashboard(data);
-      }
+      const data = await api.get<any>('/dashboard');
+      setDashboard(data);
     } catch (error) {
       console.error('Erreur chargement dashboard:', error);
     } finally {

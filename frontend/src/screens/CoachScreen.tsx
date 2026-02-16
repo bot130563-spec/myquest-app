@@ -75,7 +75,7 @@ export default function CoachScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { token } = useAuth();
+  // Token is handled internally by API module
 
   // Charger les conseils
   const loadAdvice = useCallback(async () => {

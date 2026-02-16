@@ -23,7 +23,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
-import { API_URL } from '../config';
+import { api } from '../config/api';
 
 // Configuration des humeurs avec emojis et labels
 const MOODS = [
@@ -57,7 +57,7 @@ export default function JournalScreen() {
   const [checkingToday, setCheckingToday] = useState(true);
   const [randomPrompt, setRandomPrompt] = useState('');
   
-  const { token } = useAuth();
+  // Token is handled internally by API module
 
   // Vérifier si une entrée existe déjà aujourd'hui
   useEffect(() => {
@@ -71,21 +71,15 @@ export default function JournalScreen() {
    */
   const checkTodayEntry = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/journal/today`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.entry) {
-          setTodayEntry(data.entry);
-          // Pré-remplir avec les données existantes
-          setMood(data.entry.mood);
-          setGratitudes(data.entry.gratitudes || ['', '', '']);
-          setReflection(data.entry.reflection || '');
-          setDailyGoal(data.entry.dailyGoal || '');
-          setTags(data.entry.tags?.join(', ') || '');
-        }
+      const data = await api.get<{ entry: any }>('/journal/today');
+      if (data.entry) {
+        setTodayEntry(data.entry);
+        // Pré-remplir avec les données existantes
+        setMood(data.entry.mood);
+        setGratitudes(data.entry.gratitudes || ['', '', '']);
+        setReflection(data.entry.reflection || '');
+        setDailyGoal(data.entry.dailyGoal || '');
+        setTags(data.entry.tags?.join(', ') || '');
       }
     } catch (error) {
       console.error('Erreur vérification journal:', error);
@@ -117,41 +111,28 @@ export default function JournalScreen() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/journal`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          mood,
-          gratitudes: filledGratitudes,
-          reflection: reflection.trim() || undefined,
-          dailyGoal: dailyGoal.trim() || undefined,
-          tags: tags.split(',').map(t => t.trim()).filter(t => t) || undefined,
-        }),
+      const data = await api.post<any>('/journal', {
+        mood,
+        gratitudes: filledGratitudes,
+        reflection: reflection.trim() || undefined,
+        dailyGoal: dailyGoal.trim() || undefined,
+        tags: tags.split(',').map(t => t.trim()).filter(t => t) || undefined,
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        const xpMessage = data.xpAwarded 
-          ? `\n\n🎮 +${data.xpAwarded} XP gagnés !` 
-          : '';
-        
-        Alert.alert(
-          todayEntry ? '📝 Mis à jour !' : '✨ Enregistré !',
-          `Ton journal du jour est sauvegardé.${xpMessage}`,
-          [{ text: 'Super !', style: 'default' }]
-        );
-        
-        setTodayEntry(data.entry);
-      } else {
-        Alert.alert('Erreur', data.error || 'Impossible de sauvegarder');
-      }
-    } catch (error) {
+      const xpMessage = data.xpAwarded 
+        ? `\n\n🎮 +${data.xpAwarded} XP gagnés !` 
+        : '';
+      
+      Alert.alert(
+        todayEntry ? '📝 Mis à jour !' : '✨ Enregistré !',
+        `Ton journal du jour est sauvegardé.${xpMessage}`,
+        [{ text: 'Super !', style: 'default' }]
+      );
+      
+      setTodayEntry(data.entry);
+    } catch (error: any) {
       console.error('Erreur sauvegarde journal:', error);
-      Alert.alert('Erreur', 'Problème de connexion au serveur');
+      Alert.alert('Erreur', error.message || 'Problème de connexion au serveur');
     } finally {
       setLoading(false);
     }
