@@ -17,9 +17,10 @@
 // __DEV__ est une variable globale React Native
 // true en développement, false après build
 
-const DEV_API_URL = 'http://192.168.1.83:3000';
+// En dev, utilise le serveur Render directement (évite les problèmes réseau local)
+const DEV_API_URL = 'https://myquest-api.onrender.com';
 
-// TODO: Remplacer par ton URL Render après déploiement
+// Production: même URL
 const PROD_API_URL = 'https://myquest-api.onrender.com';
 
 export const API_BASE_URL = __DEV__ ? DEV_API_URL : PROD_API_URL;
