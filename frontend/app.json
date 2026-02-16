@@ -23,14 +23,15 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1a1a2e"
       },
-      "package": "com.myquest.app"
+      "package": "com.myquest.app",
+      "usesCleartextTraffic": true
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
     "extra": {
-      "apiUrl": "http://localhost:3000/api"
+      "apiUrl": "http://192.168.1.83:3000/api"
     }
   }
 }

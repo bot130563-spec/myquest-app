@@ -17,7 +17,7 @@
 // __DEV__ est une variable globale React Native
 // true en développement, false après build
 
-const DEV_API_URL = 'http://localhost:3000';
+const DEV_API_URL = 'http://192.168.1.83:3000';
 
 // TODO: Remplacer par ton URL Render après déploiement
 const PROD_API_URL = 'https://myquest-api.onrender.com';
@@ -92,14 +92,26 @@ async function fetchApi<T>(
     (headers as Record<string, string>)['Authorization'] = `Bearer ${authToken}`;
   }
   
+  // Log pour debug
+  console.log(`📡 API Request: ${options.method || 'GET'} ${url}`);
+  
+  // Timeout de 15 secondes
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  
   try {
     const response = await fetch(url, {
       ...options,
       headers,
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
     
     // Parse la réponse JSON
     const data = await response.json();
+    
+    console.log(`✅ API Response: ${response.status}`);
     
     // Si erreur HTTP, throw une ApiError
     if (!response.ok) {
@@ -112,15 +124,25 @@ async function fetchApi<T>(
     
     return data as T;
     
-  } catch (error) {
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    // Log l'erreur pour debug
+    console.error(`❌ API Error:`, error.name, error.message);
+    
     // Si c'est déjà une ApiError, on la propage
     if (error instanceof ApiError) {
       throw error;
     }
     
-    // Erreur réseau ou autre
+    // Timeout
+    if (error.name === 'AbortError') {
+      throw new ApiError('Délai de connexion dépassé (timeout)', 0);
+    }
+    
+    // Erreur réseau ou autre - inclut le message original pour debug
     throw new ApiError(
-      'Impossible de contacter le serveur. Vérifiez votre connexion.',
+      `Impossible de contacter le serveur: ${error.message}`,
       0
     );
   }

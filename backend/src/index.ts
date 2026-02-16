@@ -124,8 +124,8 @@ async function startServer(): Promise<void> {
     // 1. Connecte à la base de données
     await connectDatabase();
     
-    // 2. Démarre le serveur HTTP
-    const server = app.listen(config.port, () => {
+    // 2. Démarre le serveur HTTP (0.0.0.0 = toutes les interfaces réseau)
+    const server = app.listen(config.port, '0.0.0.0', () => {
       console.log(`
   🎮 MyQuest API Server
   =====================
