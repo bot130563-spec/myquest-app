@@ -17,8 +17,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
+
+// Alert compatible web
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}\n\n${message}`);
+  } else {
+    const { Alert } = require('react-native');
+    Alert.alert(title, message);
+  }
+};
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
@@ -50,25 +59,32 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
    * Gère la soumission du formulaire
    */
   async function handleLogin(): Promise<void> {
+    console.log('🔐 handleLogin called');
+    console.log('Email:', email, 'Password length:', password.length);
+    
     // Validation basique
     if (!email.trim() || !password) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      console.log('❌ Validation failed');
+      showAlert('Erreur', 'Veuillez remplir tous les champs');
       return;
     }
     
     setIsSubmitting(true);
+    console.log('📡 Calling login API...');
     
     try {
       await login(email.trim().toLowerCase(), password);
+      console.log('✅ Login successful!');
       // La navigation vers Home est automatique grâce au AuthContext
       
     } catch (error) {
+      console.log('❌ Login error:', error);
       // Affiche l'erreur à l'utilisateur
       const message = error instanceof ApiError 
         ? error.message 
         : 'Une erreur est survenue';
       
-      Alert.alert('Erreur de connexion', message);
+      showAlert('Erreur de connexion', message);
       
     } finally {
       setIsSubmitting(false);

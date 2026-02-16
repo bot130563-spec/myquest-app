@@ -43,12 +43,12 @@ const app = express();
 app.use(helmet());
 
 // cors() → Autorise les requêtes depuis d'autres domaines (ton app React Native)
-// En production, tu peux restreindre les origines autorisées
+// Pour l'instant, on accepte toutes les origines (à restreindre plus tard en prod)
 app.use(cors({
-  origin: config.isDevelopment 
-    ? '*'  // Dev: accepte tout
-    : process.env.FRONTEND_URL,  // Prod: seulement le frontend
-  credentials: true,  // Permet l'envoi de cookies/headers auth
+  origin: '*',  // Accepte toutes les origines
+  credentials: false,  // Pas de cookies cross-origin avec wildcard
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 // express.json() → Parse le body des requêtes en JSON

@@ -17,9 +17,18 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
   ScrollView,
 } from 'react-native';
+
+// Alert compatible web
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}\n\n${message}`);
+  } else {
+    const { Alert } = require('react-native');
+    Alert.alert(title, message);
+  }
+};
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
@@ -54,19 +63,21 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
    * Gère la soumission du formulaire
    */
   async function handleRegister(): Promise<void> {
+    console.log('🔥 handleRegister appelé!', { email, password: '***', confirmPassword: '***' });
+    
     // ── VALIDATION ──
     if (!email.trim() || !password) {
-      Alert.alert('Erreur', 'Email et mot de passe sont requis');
+      showAlert('Erreur', 'Email et mot de passe sont requis');
       return;
     }
     
     if (password.length < 8) {
-      Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 8 caractères');
+      showAlert('Erreur', 'Le mot de passe doit contenir au moins 8 caractères');
       return;
     }
     
     if (password !== confirmPassword) {
-      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
+      showAlert('Erreur', 'Les mots de passe ne correspondent pas');
       return;
     }
     
@@ -86,7 +97,7 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
         ? error.message 
         : 'Une erreur est survenue';
       
-      Alert.alert('Erreur d\'inscription', message);
+      showAlert('Erreur d\'inscription', message);
       
     } finally {
       setIsSubmitting(false);
