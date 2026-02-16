@@ -77,6 +77,9 @@ model User {
   
   // Un user a PLUSIEURS entrées de journal (relation 1:N)
   journalEntries JournalEntry[]
+  
+  // Un user a PLUSIEURS achievements (relation 1:N)
+  achievements UserAchievement[]
 
   // @@map renomme la table en "users" (convention: pluriel, minuscule)
   @@map("users")
@@ -398,3 +401,27 @@ model JournalEntry {
 
 // ── ENUM MOOD ──
 // Note: On utilise Int (1-5) plutôt qu'un enum pour plus de flexibilité
+
+// ============================================
+// 🏆 MODEL USERACHIEVEMENT - Achievements débloqués
+// ============================================
+// Stocke les achievements débloqués par chaque utilisateur
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  
+  // Lien vers l'utilisateur
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // ID de l'achievement (défini en code, pas en DB)
+  achievementId String
+  
+  // Date de déblocage
+  unlockedAt    DateTime @default(now())
+
+  @@map("user_achievements")
+  // Un achievement ne peut être débloqué qu'une fois par user
+  @@unique([userId, achievementId])
+  @@index([userId])
+}

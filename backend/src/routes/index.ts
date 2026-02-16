@@ -28,6 +28,7 @@ import habitRoutes from './habit';
 import journalRoutes from './journal';
 import dashboardRoutes from './dashboard';
 import coachRoutes from './coach';
+import achievementsRoutes from './achievements';
 
 const router = Router();
 
@@ -136,5 +137,8 @@ router.use('/dashboard', dashboardRoutes);
 
 // Routes coach IA: /api/coach/*
 router.use('/coach', coachRoutes);
+
+// Routes achievements: /api/achievements/*
+router.use('/achievements', achievementsRoutes);
 
 export default router;

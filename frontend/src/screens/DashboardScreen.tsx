@@ -111,6 +111,13 @@ export default function DashboardScreen({ navigation }: any) {
         <View style={styles.avatarContainer}>
           <Text style={styles.avatarEmoji}>{userData.avatar?.emoji || '🧙'}</Text>
         </View>
+        {/* Bouton Achievements */}
+        <TouchableOpacity 
+          style={styles.achievementsButton}
+          onPress={() => navigation.navigate('Achievements' as never)}
+        >
+          <Text style={styles.achievementsButtonText}>🏆</Text>
+        </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.welcomeText}>
             Bienvenue, {userData.username} !
@@ -301,6 +308,20 @@ const styles = StyleSheet.create({
   },
   avatarEmoji: {
     fontSize: 40,
+  },
+  achievementsButton: {
+    position: 'absolute',
+    top: 45,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  achievementsButtonText: {
+    fontSize: 24,
   },
   headerInfo: {
     flex: 1,
