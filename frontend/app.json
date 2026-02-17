@@ -31,7 +31,7 @@
       "bundler": "metro"
     },
     "extra": {
-      "apiUrl": "http://192.168.1.83:3000/api"
+      "apiUrl": "https://myquest-api.onrender.com/api"
     }
   }
 }
