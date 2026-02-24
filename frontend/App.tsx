@@ -43,6 +43,7 @@ import CreateHabitScreen from './src/screens/CreateHabitScreen';
 import JournalScreen from './src/screens/JournalScreen';
 import CoachScreen from './src/screens/CoachScreen';
 import AchievementsScreen from './src/screens/AchievementsScreen';
+import LeaderboardScreen from './src/screens/LeaderboardScreen';
 
 // Thème
 import { colors } from './src/theme/colors';
@@ -72,6 +73,7 @@ export type AppStackParamList = {
   CreateQuest: undefined;
   CreateHabit: undefined;
   Achievements: undefined;
+  Leaderboard: undefined;
   // Avatar: undefined;
   // Settings: undefined;
 };
@@ -233,12 +235,19 @@ function AppNavigator() {
           presentation: 'modal',
         }}
       />
-      <AppStack.Screen 
-        name="Achievements" 
+      <AppStack.Screen
+        name="Achievements"
         component={AchievementsScreen}
         options={{
           title: 'Achievements',
           headerShown: false,
+        }}
+      />
+      <AppStack.Screen
+        name="Leaderboard"
+        component={LeaderboardScreen}
+        options={{
+          title: 'Classement',
         }}
       />
       {/* TODO: Ajouter les écrans suivants
