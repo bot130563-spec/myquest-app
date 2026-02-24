@@ -38,9 +38,11 @@ const MOOD_EMOJIS = ['', '😢', '😕', '😐', '🙂', '😄'];
 
 export default function DashboardScreen({ navigation }: any) {
   const [dashboard, setDashboard] = useState<any>(null);
+  const [weeklySummary, setWeeklySummary] = useState<any>(null);
+  const [dailyProgress, setDailyProgress] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   const { user } = useAuth();
 
   // Charger les données au montage
@@ -53,8 +55,14 @@ export default function DashboardScreen({ navigation }: any) {
    */
   const loadDashboard = async () => {
     try {
-      const data = await api.get<any>('/dashboard');
-      setDashboard(data);
+      const [dashData, weeklyData, dailyData] = await Promise.all([
+        api.get<any>('/dashboard'),
+        api.get<any>('/dashboard/weekly-summary'),
+        api.get<any>('/dashboard/daily-progress'),
+      ]);
+      setDashboard(dashData);
+      setWeeklySummary(weeklyData);
+      setDailyProgress(dailyData);
     } catch (error) {
       console.error('Erreur chargement dashboard:', error);
     } finally {
@@ -112,11 +120,18 @@ export default function DashboardScreen({ navigation }: any) {
           <Text style={styles.avatarEmoji}>{userData.avatar?.emoji || '🧙'}</Text>
         </View>
         {/* Bouton Achievements */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.achievementsButton}
           onPress={() => navigation.navigate('Achievements' as never)}
         >
           <Text style={styles.achievementsButtonText}>🏆</Text>
+        </TouchableOpacity>
+        {/* Bouton Leaderboard */}
+        <TouchableOpacity
+          style={styles.leaderboardButton}
+          onPress={() => navigation.navigate('Leaderboard' as never)}
+        >
+          <Text style={styles.leaderboardButtonText}>🥇</Text>
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.welcomeText}>
@@ -149,6 +164,55 @@ export default function DashboardScreen({ navigation }: any) {
           ))}
         </View>
       </View>
+
+      {/* Progression du jour (Daily Progress Bar) */}
+      {dailyProgress && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📈 Progression du jour</Text>
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBarBg}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${dailyProgress.percentage}%` }
+                ]}
+              />
+            </View>
+            <Text style={styles.progressLabel}>
+              {dailyProgress.message}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Résumé hebdomadaire (Weekly Summary) */}
+      {weeklySummary && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📅 Résumé de la semaine</Text>
+          <View style={styles.weeklyGrid}>
+            <View style={styles.weeklyItem}>
+              <Text style={styles.weeklyIcon}>⚔️</Text>
+              <Text style={styles.weeklyValue}>{weeklySummary.questsCompleted}</Text>
+              <Text style={styles.weeklyLabel}>Quêtes</Text>
+            </View>
+            <View style={styles.weeklyItem}>
+              <Text style={styles.weeklyIcon}>🔥</Text>
+              <Text style={styles.weeklyValue}>{weeklySummary.habitsAverageStreak}</Text>
+              <Text style={styles.weeklyLabel}>Streak moy.</Text>
+            </View>
+            <View style={styles.weeklyItem}>
+              <Text style={styles.weeklyIcon}>📓</Text>
+              <Text style={styles.weeklyValue}>{weeklySummary.journalEntries}</Text>
+              <Text style={styles.weeklyLabel}>Entrées</Text>
+            </View>
+            <View style={styles.weeklyItem}>
+              <Text style={styles.weeklyIcon}>⭐</Text>
+              <Text style={styles.weeklyValue}>{weeklySummary.xpEarned}</Text>
+              <Text style={styles.weeklyLabel}>XP gagné</Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Résumé des quêtes */}
       <View style={styles.section}>
@@ -321,6 +385,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   achievementsButtonText: {
+    fontSize: 24,
+  },
+  leaderboardButton: {
+    position: 'absolute',
+    top: 45,
+    right: 75,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  leaderboardButtonText: {
     fontSize: 24,
   },
   headerInfo: {
@@ -522,5 +600,48 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 40,
+  },
+  progressContainer: {
+    marginTop: 8,
+  },
+  progressBarBg: {
+    height: 12,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#00b894',
+    borderRadius: 6,
+  },
+  progressLabel: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#2d3436',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  weeklyGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 8,
+  },
+  weeklyItem: {
+    alignItems: 'center',
+  },
+  weeklyIcon: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  weeklyValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#6c5ce7',
+  },
+  weeklyLabel: {
+    fontSize: 11,
+    color: '#636e72',
+    marginTop: 2,
   },
 });

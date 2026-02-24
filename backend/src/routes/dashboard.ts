@@ -281,4 +281,126 @@ function generateTips(data: TipsInput): string[] {
   return tips;
 }
 
+// ============================================
+// 📈 GET /dashboard/weekly-summary - Résumé hebdomadaire
+// ============================================
+router.get('/weekly-summary', async (req: Request, res: Response) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Il y a 7 jours
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+
+    // Quêtes complétées cette semaine
+    const questsCompleted = await prisma.quest.count({
+      where: {
+        userId: req.userId,
+        status: 'COMPLETED',
+        completedAt: { gte: sevenDaysAgo },
+      },
+    });
+
+    // Logs d'habitudes cette semaine
+    const habitLogs = await prisma.habitLog.count({
+      where: {
+        habit: { userId: req.userId },
+        completedDate: { gte: sevenDaysAgo },
+      },
+    });
+
+    // Calculer le streak moyen des habitudes actives
+    const habits = await prisma.habit.findMany({
+      where: {
+        userId: req.userId,
+        isActive: true,
+      },
+      select: { streakCount: true },
+    });
+
+    const avgStreak = habits.length > 0
+      ? Math.round(habits.reduce((sum, h) => sum + h.streakCount, 0) / habits.length)
+      : 0;
+
+    // Entrées de journal cette semaine
+    const journalEntries = await prisma.journalEntry.count({
+      where: {
+        userId: req.userId,
+        entryDate: { gte: sevenDaysAgo },
+      },
+    });
+
+    // XP gagné cette semaine (estimation)
+    const xpFromQuests = questsCompleted * 25; // Moyenne XP quête
+    const xpFromHabits = habitLogs * 10; // XP par habitude
+    const xpTotal = xpFromQuests + xpFromHabits;
+
+    res.json({
+      period: 'last7days',
+      questsCompleted,
+      habitsAverageStreak: avgStreak,
+      habitCompletions: habitLogs,
+      journalEntries,
+      xpEarned: xpTotal,
+    });
+
+  } catch (error) {
+    console.error('Get weekly summary error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Erreur lors de la récupération du résumé hebdomadaire',
+    });
+  }
+});
+
+// ============================================
+// 📊 GET /dashboard/daily-progress - Progression du jour
+// ============================================
+router.get('/daily-progress', async (req: Request, res: Response) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Récupère toutes les habitudes actives
+    const allHabits = await prisma.habit.findMany({
+      where: {
+        userId: req.userId,
+        isActive: true,
+      },
+      include: {
+        logs: {
+          where: { completedDate: today },
+        },
+      },
+    });
+
+    // Filtre celles qui doivent être faites aujourd'hui
+    const todayHabits = allHabits.filter(h =>
+      shouldDoToday(h.frequency, h.targetDays as number[])
+    );
+
+    const goal = todayHabits.length;
+    const completed = todayHabits.filter(h => h.logs.length > 0).length;
+    const percentage = goal > 0 ? Math.round((completed / goal) * 100) : 100;
+
+    res.json({
+      goal,
+      completed,
+      remaining: goal - completed,
+      percentage,
+      message: percentage === 100 && goal > 0
+        ? '🎉 Toutes les habitudes du jour sont complétées!'
+        : `${completed}/${goal} habitudes complétées`,
+    });
+
+  } catch (error) {
+    console.error('Get daily progress error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Erreur lors de la récupération de la progression du jour',
+    });
+  }
+});
+
 export default router;
