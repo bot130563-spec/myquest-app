@@ -66,6 +66,7 @@ export default function CreateHabitScreen({ navigation }: CreateHabitScreenProps
   const [category, setCategory] = useState('GENERAL');
   const [frequency, setFrequency] = useState('DAILY');
   const [targetDays, setTargetDays] = useState<number[]>([]);
+  const [reminderTime, setReminderTime] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   function toggleDay(day: number): void {
@@ -90,13 +91,19 @@ export default function CreateHabitScreen({ navigation }: CreateHabitScreenProps
     setIsSubmitting(true);
 
     try {
-      await api.post('/habits', {
+      const habitData: any = {
         title: title.trim(),
         icon,
         category,
         frequency,
         targetDays: frequency === 'WEEKLY' ? targetDays : [],
-      });
+      };
+
+      if (reminderTime.trim()) {
+        habitData.reminderTime = reminderTime.trim();
+      }
+
+      await api.post('/habits', habitData);
 
       Alert.alert(
         '🔄 Habitude créée!',
@@ -232,6 +239,23 @@ export default function CreateHabitScreen({ navigation }: CreateHabitScreenProps
         )}
 
         {/* ═══════════════════════════════════════ */}
+        {/* ⏰ HEURE DE RAPPEL */}
+        {/* ═══════════════════════════════════════ */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>⏰ Heure de rappel (optionnel)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: 08:00"
+            placeholderTextColor={colors.textMuted}
+            value={reminderTime}
+            onChangeText={setReminderTime}
+            maxLength={5}
+            keyboardType="numeric"
+          />
+          <Text style={styles.hintText}>Format HH:mm (ex: 08:00, 14:30)</Text>
+        </View>
+
+        {/* ═══════════════════════════════════════ */}
         {/* 🎁 INFO RÉCOMPENSE */}
         {/* ═══════════════════════════════════════ */}
         <View style={styles.infoCard}>
@@ -293,7 +317,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  
+  hintText: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+
   // Icons Grid
   iconsGrid: {
     flexDirection: 'row',
