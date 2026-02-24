@@ -374,13 +374,15 @@ router.post('/:id/complete', async (req: Request, res: Response) => {
       
       const newStreak = yesterdayLog ? habit.currentStreak + 1 : 1;
       const newLongest = Math.max(habit.longestStreak, newStreak);
-      
+
       await tx.habit.update({
         where: { id: habit.id },
         data: {
           currentStreak: newStreak,
           longestStreak: newLongest,
+          streakCount: newStreak,
           totalCompletions: { increment: 1 },
+          lastCompletedAt: new Date(),
         },
       });
       
@@ -518,6 +520,112 @@ router.get('/:id/history', async (req: Request, res: Response) => {
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Erreur lors de la récupération de l\'historique',
+    });
+  }
+});
+
+// ============================================
+// ⏰ PATCH /habits/:id/reminder - Configurer le rappel
+// ============================================
+router.patch('/:id/reminder', async (req: Request, res: Response) => {
+  try {
+    const habit = await prisma.habit.findFirst({
+      where: {
+        id: req.params.id,
+        userId: req.userId,
+      },
+    });
+
+    if (!habit) {
+      res.status(404).json({
+        error: 'Not Found',
+        message: 'Habitude non trouvée',
+      });
+      return;
+    }
+
+    const { reminderTime } = req.body;
+
+    // Validation basique du format HH:mm
+    if (reminderTime && !/^\d{2}:\d{2}$/.test(reminderTime)) {
+      res.status(400).json({
+        error: 'Validation Error',
+        message: 'Format invalide. Utilise HH:mm (ex: 08:00)',
+      });
+      return;
+    }
+
+    const updated = await prisma.habit.update({
+      where: { id: req.params.id },
+      data: { reminderTime: reminderTime || null },
+    });
+
+    res.json({
+      message: reminderTime
+        ? `⏰ Rappel configuré à ${reminderTime}`
+        : '⏰ Rappel supprimé',
+      habit: {
+        id: updated.id,
+        title: updated.title,
+        reminderTime: updated.reminderTime,
+      },
+    });
+
+  } catch (error) {
+    console.error('Update reminder error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Erreur lors de la configuration du rappel',
+    });
+  }
+});
+
+// ============================================
+// 🔥 GET /habits/:id/streak - Streak actuel
+// ============================================
+router.get('/:id/streak', async (req: Request, res: Response) => {
+  try {
+    const habit = await prisma.habit.findFirst({
+      where: {
+        id: req.params.id,
+        userId: req.userId,
+      },
+      select: {
+        id: true,
+        title: true,
+        icon: true,
+        currentStreak: true,
+        streakCount: true,
+        longestStreak: true,
+        lastCompletedAt: true,
+        totalCompletions: true,
+      },
+    });
+
+    if (!habit) {
+      res.status(404).json({
+        error: 'Not Found',
+        message: 'Habitude non trouvée',
+      });
+      return;
+    }
+
+    res.json({
+      habitId: habit.id,
+      title: habit.title,
+      icon: habit.icon,
+      currentStreak: habit.currentStreak,
+      streakCount: habit.streakCount,
+      longestStreak: habit.longestStreak,
+      lastCompletedAt: habit.lastCompletedAt,
+      totalCompletions: habit.totalCompletions,
+    });
+
+  } catch (error) {
+    console.error('Get habit streak error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Erreur lors de la récupération du streak',
     });
   }
 });

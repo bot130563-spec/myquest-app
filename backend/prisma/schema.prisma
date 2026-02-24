@@ -294,12 +294,17 @@ model Habit {
   
   // ── ÉTAT ──
   isActive    Boolean  @default(true)  // Habitude activée?
-  
+
+  // ── RAPPEL ──
+  reminderTime String?                 // Heure de rappel (format HH:mm)
+
   // ── PROGRESSION ──
   currentStreak   Int  @default(0)    // Jours consécutifs
   longestStreak   Int  @default(0)    // Record personnel
   totalCompletions Int @default(0)    // Total depuis création
-  
+  streakCount     Int  @default(0)    // Streak actuel (Duolingo-style)
+  lastCompletedAt DateTime?           // Dernière date de complétion
+
   // ── TIMESTAMPS ──
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
