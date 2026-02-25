@@ -81,6 +81,12 @@ model User {
   // Un user a PLUSIEURS achievements (relation 1:N)
   achievements UserAchievement[]
 
+  // Un user a UN profil coach (relation 1:1)
+  coachProfile CoachProfile?
+
+  // Un user a PLUSIEURS sessions de coaching (relation 1:N)
+  coachSessions CoachSession[]
+
   // @@map renomme la table en "users" (convention: pluriel, minuscule)
   @@map("users")
 }
@@ -406,6 +412,122 @@ model JournalEntry {
 
 // ── ENUM MOOD ──
 // Note: On utilise Int (1-5) plutôt qu'un enum pour plus de flexibilité
+
+// ============================================
+// 🤖 MODEL COACHPROFILE - Profil de coaching personnalisé
+// ============================================
+// Stocke l'état du coaching, la phase actuelle et les insights
+// de l'agent coach pour chaque utilisateur
+
+model CoachProfile {
+  id            String   @id @default(cuid())
+
+  // Lien vers l'utilisateur (1:1)
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // ── PHASE ACTUELLE DU COACHING ──
+  // 1 = Connaissance de soi (introspection)
+  // 2 = Vision et ambitions
+  // 3 = Diagnostic des habitudes (Atomic Habits)
+  // 4 = Plan d'action et suivi
+  currentPhase  Int      @default(1)
+
+  // ── PHASE 1: INTROSPECTION ──
+  // Valeurs profondes identifiées (JSON array)
+  // Ex: ["authenticité", "liberté", "impact", "famille", "créativité"]
+  values        Json?
+
+  // Forces et talents naturels (JSON array)
+  // Ex: ["communication", "résolution de problèmes", "empathie"]
+  strengths     Json?
+
+  // Croyances limitantes vs croyances ressources (JSON object)
+  // Ex: { "limitantes": ["Je ne suis pas assez..."], "ressources": ["Je peux apprendre"] }
+  beliefs       Json?
+
+  // ── PHASE 2: VISION ──
+  // Vision à court terme (3 mois)
+  vision3m      String?
+
+  // Vision à moyen terme (1 an)
+  vision1y      String?
+
+  // Vision à long terme (5 ans)
+  vision5y      String?
+
+  // Résultat ikigai (JSON object)
+  // Ex: { "passion": "...", "mission": "...", "vocation": "...", "profession": "..." }
+  ikigai        Json?
+
+  // ── PHASE 3: ANALYSE DES HABITUDES ──
+  // Patterns comportementaux détectés (JSON array)
+  // Ex: [{ "habit": "sport", "pattern": "fort le matin", "recommendation": "..." }]
+  habitPatterns Json?
+
+  // 3 habitudes clés identifiées pour atteindre la vision (JSON array)
+  // Ex: [{ "title": "Méditer 10min", "why": "...", "cue": "...", "reward": "..." }]
+  keyHabits     Json?
+
+  // ── HISTORIQUE ET NOTES ──
+  // Nombre total de sessions de coaching
+  totalSessions Int      @default(0)
+
+  // Date de la dernière session
+  lastSessionAt DateTime?
+
+  // Notes accumulées par le coach (JSON array)
+  // Ex: [{ "date": "...", "insight": "...", "action": "..." }]
+  coachNotes    Json?
+
+  // Résultat du Wheel of Life (JSON object)
+  // Ex: { "santé": 7, "relations": 8, "carrière": 5, ... }
+  wheelOfLife   Json?
+
+  // ── TIMESTAMPS ──
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("coach_profiles")
+}
+
+// ============================================
+// 💬 MODEL COACHSESSION - Sessions de coaching
+// ============================================
+// Stocke l'historique des conversations avec le coach
+
+model CoachSession {
+  id         String   @id @default(cuid())
+
+  // Lien vers l'utilisateur
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Phase du coaching lors de cette session
+  phase      Int
+
+  // Historique des messages de la conversation (JSON array)
+  // Ex: [{ "role": "user", "content": "..." }, { "role": "assistant", "content": "..." }]
+  messages   Json
+
+  // Insights extraits de la session (JSON array)
+  // Ex: ["L'utilisateur se sent bloqué par...", "Force identifiée: ..."]
+  insights   Json?
+
+  // Actions définies lors de la session (JSON array)
+  // Ex: [{ "action": "Commencer par 2min de méditation", "deadline": "..." }]
+  actions    Json?
+
+  // Résumé de la session (généré par le coach)
+  summary    String?  @db.Text
+
+  // ── TIMESTAMPS ──
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("coach_sessions")
+  @@index([userId, createdAt])
+}
 
 // ============================================
 // 🏆 MODEL USERACHIEVEMENT - Achievements débloqués
