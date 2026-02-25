@@ -43,11 +43,12 @@ myquest-app/
 - ✅ AI Coach (conseils personnalisés)
 
 ## Features en cours (ne pas refaire)
-- 🔨 Streak System (habit completion + streak counter)
-- 🔨 Weekly Summary endpoint
-- 🔨 Daily Progress bar
-- 🔨 Reminder time sur Habits
-- 🔨 Leaderboard
+- ✅ Streak System (POST /complete + GET /streak + 🔥 UI)
+- ✅ Weekly Summary (GET /dashboard/weekly-summary)
+- ✅ Daily Progress bar (GET /dashboard/daily-progress)
+- ✅ Reminder time sur Habits (PATCH /habits/:id/reminder)
+- ✅ Leaderboard (GET /leaderboard + LeaderboardScreen)
+- ✅ Tests Jest backend (24 tests, 4 fichiers)
 
 ## Conventions de code
 - TypeScript strict
