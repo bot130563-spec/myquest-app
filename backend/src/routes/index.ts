@@ -30,6 +30,7 @@ import dashboardRoutes from './dashboard';
 import coachRoutes from './coach';
 import achievementsRoutes from './achievements';
 import leaderboardRoutes from './leaderboard';
+import agentRoutes from './agent';
 
 const router = Router();
 
@@ -144,5 +145,8 @@ router.use('/achievements', achievementsRoutes);
 
 // Routes leaderboard: /api/leaderboard
 router.use('/leaderboard', leaderboardRoutes);
+
+// Routes agent coach: /api/agent/*
+router.use('/agent', agentRoutes);
 
 export default router;

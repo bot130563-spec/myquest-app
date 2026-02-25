@@ -29,6 +29,9 @@ declare global {
   namespace Express {
     interface Request {
       userId?: string;
+      user?: {
+        userId: string;
+      };
     }
   }
 }
@@ -79,9 +82,10 @@ export function authMiddleware(
     const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
     
     // ── ÉTAPE 4: Ajouter userId à la requête ──
-    // Les routes suivantes peuvent utiliser req.userId
+    // Les routes suivantes peuvent utiliser req.userId ou req.user
     req.userId = decoded.userId;
-    
+    req.user = { userId: decoded.userId };
+
     // ── ÉTAPE 5: Passer au middleware/route suivant ──
     next();
     
@@ -131,3 +135,6 @@ export function generateToken(userId: string): string {
     { expiresIn: '7d' }   // Durée de vie: 7 jours
   );
 }
+
+// Alias pour compatibilité
+export const authenticateToken = authMiddleware;
