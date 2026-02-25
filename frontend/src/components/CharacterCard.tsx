@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Animated,
 } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface Stats {
   health: number;
@@ -35,11 +36,11 @@ interface CharacterCardProps {
 
 // Configuration des stats avec icônes et couleurs
 const STAT_CONFIG = [
-  { key: 'health', icon: '❤️', label: 'Santé', color: '#e74c3c', max: 100 },
-  { key: 'energy', icon: '⚡', label: 'Énergie', color: '#f39c12', max: 100 },
-  { key: 'wisdom', icon: '📚', label: 'Sagesse', color: '#3498db', max: 100 },
-  { key: 'social', icon: '👥', label: 'Social', color: '#9b59b6', max: 100 },
-  { key: 'wealth', icon: '💰', label: 'Richesse', color: '#27ae60', max: 100 },
+  { key: 'health', iconType: 'Ionicons', iconName: 'heart', label: 'Santé', color: '#e74c3c', max: 100 },
+  { key: 'energy', iconType: 'Ionicons', iconName: 'flash', label: 'Énergie', color: '#f39c12', max: 100 },
+  { key: 'wisdom', iconType: 'Ionicons', iconName: 'book', label: 'Sagesse', color: '#3498db', max: 100 },
+  { key: 'social', iconType: 'Ionicons', iconName: 'people', label: 'Social', color: '#9b59b6', max: 100 },
+  { key: 'wealth', iconType: 'Ionicons', iconName: 'cash', label: 'Richesse', color: '#27ae60', max: 100 },
 ] as const;
 
 // Fonction pour déterminer l'emoji selon le niveau
@@ -152,10 +153,12 @@ export default function CharacterCard({ user, stats, streak }: CharacterCardProp
             outputRange: ['0%', '100%'],
           });
 
+          const IconComponent = config.iconType === 'Ionicons' ? Ionicons : MaterialCommunityIcons;
+
           return (
             <View key={config.key} style={styles.statRow}>
               <View style={styles.statHeader}>
-                <Text style={styles.statIcon}>{config.icon}</Text>
+                <IconComponent name={config.iconName as any} size={18} color={config.color} style={styles.statIconVector} />
                 <Text style={styles.statLabel}>{config.label}</Text>
               </View>
               <View style={styles.statBarContainer}>
@@ -180,8 +183,9 @@ export default function CharacterCard({ user, stats, streak }: CharacterCardProp
       {/* Bannière streak */}
       {streak > 0 && (
         <View style={styles.streakBanner}>
+          <MaterialCommunityIcons name="fire" size={20} color="#ff6b00" style={{ marginRight: 8 }} />
           <Text style={styles.streakText}>
-            🔥 {streak} jour{streak > 1 ? 's' : ''} de suite
+            {streak} jour{streak > 1 ? 's' : ''} de suite
           </Text>
         </View>
       )}
@@ -257,8 +261,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  statIcon: {
-    fontSize: 18,
+  statIconVector: {
     marginRight: 8,
   },
   statLabel: {
@@ -297,7 +300,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ff6b00',
     width: '100%',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   streakText: {
     fontSize: 16,

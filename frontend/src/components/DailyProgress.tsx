@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Animated,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface DailyProgressProps {
   goal: number;
@@ -38,7 +39,10 @@ export default function DailyProgress({ goal, completed, percentage }: DailyProg
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🎯 Objectif du jour</Text>
+      <View style={styles.titleRow}>
+        <Ionicons name="target" size={20} color="#eaeaea" style={{ marginRight: 8 }} />
+        <Text style={styles.title}>Objectif du jour</Text>
+      </View>
 
       {/* Barre de progression */}
       <View style={styles.progressBarBackground}>
@@ -64,7 +68,7 @@ export default function DailyProgress({ goal, completed, percentage }: DailyProg
       {/* Message de félicitation si 100% */}
       {isComplete && (
         <View style={styles.congratsContainer}>
-          <Text style={styles.congratsText}>🎉 Journée parfaite !</Text>
+          <Text style={styles.congratsText}>Journée parfaite !</Text>
         </View>
       )}
     </View>
@@ -84,12 +88,16 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#eaeaea',
-    marginBottom: 16,
-    textAlign: 'center',
   },
   progressBarBackground: {
     height: 20,

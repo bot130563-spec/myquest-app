@@ -20,6 +20,7 @@ import {
   TouchableOpacity,
   Animated,
 } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../config/api';
 import CharacterCard from '../components/CharacterCard';
@@ -137,13 +138,13 @@ export default function DashboardScreen({ navigation }: any) {
       {/* Header simple */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
-          Bonjour, {characterUser.name} 👋
+          Bonjour, {characterUser.name}
         </Text>
         <TouchableOpacity
           style={styles.notificationButton}
           onPress={() => navigation.navigate('Achievements' as never)}
         >
-          <Text style={styles.notificationIcon}>🔔</Text>
+          <Ionicons name="notifications-outline" size={24} color="#FFD700" />
         </TouchableOpacity>
       </View>
 
@@ -171,9 +172,12 @@ export default function DashboardScreen({ navigation }: any) {
       <View style={styles.sectionContainer}>
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>⚔️ Quêtes actives ({quests?.active || 0})</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <MaterialCommunityIcons name="sword" size={20} color="#eaeaea" style={{ marginRight: 8 }} />
+              <Text style={styles.sectionTitle}>Quêtes actives ({quests?.active || 0})</Text>
+            </View>
             <TouchableOpacity onPress={() => navigation?.navigate('Quests')}>
-              <Text style={styles.seeAllText}>→</Text>
+              <Ionicons name="arrow-forward" size={24} color="#FFD700" />
             </TouchableOpacity>
           </View>
 
@@ -194,31 +198,46 @@ export default function DashboardScreen({ navigation }: any) {
       {weeklySummary && (
         <View style={styles.sectionContainer}>
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>📅 Cette semaine</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <Ionicons name="calendar" size={20} color="#eaeaea" style={{ marginRight: 8 }} />
+              <Text style={styles.sectionTitle}>Cette semaine</Text>
+            </View>
             <View style={styles.weeklyCompactGrid}>
               <View style={styles.weeklyCompactItem}>
                 <Text style={styles.weeklyCompactValue}>
                   {weeklySummary.questsCompleted}
                 </Text>
-                <Text style={styles.weeklyCompactLabel}>⚔️ Quêtes</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <MaterialCommunityIcons name="sword" size={14} color="#b8b8b8" style={{ marginRight: 4 }} />
+                  <Text style={styles.weeklyCompactLabel}>Quêtes</Text>
+                </View>
               </View>
               <View style={styles.weeklyCompactItem}>
                 <Text style={styles.weeklyCompactValue}>
                   {weeklySummary.habitCompletions}
                 </Text>
-                <Text style={styles.weeklyCompactLabel}>🔄 Habitudes</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="repeat" size={14} color="#b8b8b8" style={{ marginRight: 4 }} />
+                  <Text style={styles.weeklyCompactLabel}>Habitudes</Text>
+                </View>
               </View>
               <View style={styles.weeklyCompactItem}>
                 <Text style={styles.weeklyCompactValue}>
                   {weeklySummary.journalEntries}
                 </Text>
-                <Text style={styles.weeklyCompactLabel}>📓 Entrées</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="journal" size={14} color="#b8b8b8" style={{ marginRight: 4 }} />
+                  <Text style={styles.weeklyCompactLabel}>Entrées</Text>
+                </View>
               </View>
               <View style={styles.weeklyCompactItem}>
                 <Text style={styles.weeklyCompactValue}>
                   {weeklySummary.xpEarned}
                 </Text>
-                <Text style={styles.weeklyCompactLabel}>⭐ XP</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="star" size={14} color="#b8b8b8" style={{ marginRight: 4 }} />
+                  <Text style={styles.weeklyCompactLabel}>XP</Text>
+                </View>
               </View>
             </View>
           </View>
@@ -285,9 +304,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  notificationIcon: {
-    fontSize: 20,
   },
   characterCardContainer: {
     marginHorizontal: 16,

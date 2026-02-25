@@ -21,6 +21,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { api, ApiError } from '../config/api';
 
@@ -135,7 +136,10 @@ export default function HabitsScreen({ navigation }: HabitsScreenProps) {
       {/* ═══════════════════════════════════════ */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Text style={styles.dateText}>📅 {data?.dayName}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="calendar" size={18} color={colors.textLight} style={{ marginRight: 6 }} />
+            <Text style={styles.dateText}>{data?.dayName}</Text>
+          </View>
           <Text style={styles.progressText}>
             {progress.completed}/{progress.total}
           </Text>
@@ -150,9 +154,9 @@ export default function HabitsScreen({ navigation }: HabitsScreenProps) {
             ]} 
           />
         </View>
-        
+
         {progress.percentage === 100 && progress.total > 0 && (
-          <Text style={styles.completeText}>🎉 Toutes les habitudes du jour sont faites!</Text>
+          <Text style={styles.completeText}>Toutes les habitudes du jour sont faites!</Text>
         )}
       </View>
 
@@ -172,7 +176,7 @@ export default function HabitsScreen({ navigation }: HabitsScreenProps) {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🔄</Text>
+            <Ionicons name="repeat" size={64} color={colors.textMuted} style={{ marginBottom: 16 }} />
             <Text style={styles.emptyText}>Pas d'habitudes pour aujourd'hui</Text>
             <Text style={styles.emptySubtext}>Crée ta première habitude!</Text>
           </View>
@@ -226,9 +230,10 @@ function HabitCard({ habit, onComplete }: HabitCardProps) {
             <View style={styles.habitMeta}>
               <Text style={styles.habitCategory}>{habit.categoryLabel}</Text>
               {habit.currentStreak > 0 && (
-                <Text style={styles.habitStreak}>
-                  🔥 {habit.currentStreak} j
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <MaterialCommunityIcons name="fire" size={12} color={colors.warning} style={{ marginRight: 2 }} />
+                  <Text style={styles.habitStreak}>{habit.currentStreak} j</Text>
+                </View>
               )}
             </View>
           </View>
@@ -241,11 +246,13 @@ function HabitCard({ habit, onComplete }: HabitCardProps) {
       {/* Action Button */}
       {!isCompleted ? (
         <TouchableOpacity style={styles.checkButton} onPress={onComplete}>
-          <Text style={styles.checkButtonText}>✓ Fait!</Text>
+          <Ionicons name="checkmark-circle" size={20} color={colors.textLight} style={{ marginRight: 6 }} />
+          <Text style={styles.checkButtonText}>Fait!</Text>
         </TouchableOpacity>
       ) : (
         <View style={styles.doneIndicator}>
-          <Text style={styles.doneText}>✅ Complété</Text>
+          <Ionicons name="checkmark-done-circle" size={20} color={colors.success} style={{ marginRight: 6 }} />
+          <Text style={styles.doneText}>Complété</Text>
         </View>
       )}
     </View>
@@ -319,10 +326,6 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: 60,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
   },
   emptyText: {
     fontSize: 18,
@@ -398,7 +401,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success,
     borderRadius: 10,
     padding: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   checkButtonText: {
     color: colors.textLight,
@@ -407,7 +412,9 @@ const styles = StyleSheet.create({
   },
   doneIndicator: {
     padding: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   doneText: {
     color: colors.success,
