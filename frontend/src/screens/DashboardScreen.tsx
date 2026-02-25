@@ -1,17 +1,15 @@
 /**
  * DashboardScreen.tsx
- * Tableau de bord principal - vue d'ensemble de la progression
- * 
+ * Écran d'accueil RPG - Fiche de personnage
+ *
  * Affiche:
- * - Niveau et XP avec barre de progression
- * - Statistiques du personnage (santé, énergie, sagesse, social, richesse)
+ * - Carte de personnage avec avatar, niveau, XP et stats animées
+ * - Progression quotidienne des habitudes
  * - Résumé des quêtes actives
- * - Streaks d'habitudes
- * - Humeur récente (journal)
- * - Conseils personnalisés
+ * - Résumé hebdomadaire compact
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -20,21 +18,12 @@ import {
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
+  Animated,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../config/api';
-
-// Icônes pour les statistiques
-const STAT_CONFIG = {
-  health: { icon: '❤️', label: 'Santé', color: '#e74c3c' },
-  energy: { icon: '⚡', label: 'Énergie', color: '#f39c12' },
-  wisdom: { icon: '📚', label: 'Sagesse', color: '#3498db' },
-  social: { icon: '👥', label: 'Social', color: '#9b59b6' },
-  wealth: { icon: '💰', label: 'Richesse', color: '#27ae60' },
-};
-
-// Emojis humeur pour l'affichage
-const MOOD_EMOJIS = ['', '😢', '😕', '😐', '🙂', '😄'];
+import CharacterCard from '../components/CharacterCard';
+import DailyProgress from '../components/DailyProgress';
 
 export default function DashboardScreen({ navigation }: any) {
   const [dashboard, setDashboard] = useState<any>(null);
@@ -45,10 +34,24 @@ export default function DashboardScreen({ navigation }: any) {
 
   const { user } = useAuth();
 
+  // Animation de fade in pour l'écran
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
   // Charger les données au montage
   useEffect(() => {
     loadDashboard();
   }, []);
+
+  // Animation fade in après le chargement
+  useEffect(() => {
+    if (!loading) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [loading]);
 
   /**
    * Récupère toutes les données du tableau de bord depuis l'API
@@ -101,253 +104,159 @@ export default function DashboardScreen({ navigation }: any) {
     );
   }
 
-  const { user: userData, quests, habits, journal, tips } = dashboard;
-  const xpProgress = userData.xpToNextLevel > 0 
-    ? (userData.xpProgress / userData.xpToNextLevel) * 100 
-    : 100;
+  const { avatar, stats, quests, habits } = dashboard;
+
+  // Préparer les données pour CharacterCard
+  const characterUser = {
+    name: user?.name || avatar?.name || 'Héros',
+    level: avatar?.level || 1,
+    experience: avatar?.experience || 0,
+    xpForNextLevel: avatar?.xpForNextLevel || 100,
+    totalXp: stats?.globalScore || 0,
+  };
+
+  const characterStats = {
+    health: stats?.health || 50,
+    energy: stats?.energy || 50,
+    wisdom: stats?.wisdom || 50,
+    social: stats?.social || 50,
+    wealth: stats?.wealth || 50,
+  };
+
+  const currentStreak = stats?.currentStreak || 0;
 
   return (
-    <ScrollView 
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-      showsVerticalScrollIndicator={false}
-    >
-      {/* En-tête avec niveau et XP */}
+    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+      {/* Header simple */}
       <View style={styles.header}>
-        <View style={styles.avatarContainer}>
-          <Text style={styles.avatarEmoji}>{userData.avatar?.emoji || '🧙'}</Text>
-        </View>
-        {/* Bouton Achievements */}
+        <Text style={styles.headerTitle}>
+          Bonjour, {characterUser.name} 👋
+        </Text>
         <TouchableOpacity
-          style={styles.achievementsButton}
+          style={styles.notificationButton}
           onPress={() => navigation.navigate('Achievements' as never)}
         >
-          <Text style={styles.achievementsButtonText}>🏆</Text>
+          <Text style={styles.notificationIcon}>🔔</Text>
         </TouchableOpacity>
-        {/* Bouton Leaderboard */}
-        <TouchableOpacity
-          style={styles.leaderboardButton}
-          onPress={() => navigation.navigate('Leaderboard' as never)}
-        >
-          <Text style={styles.leaderboardButtonText}>🥇</Text>
-        </TouchableOpacity>
-        <View style={styles.headerInfo}>
-          <Text style={styles.welcomeText}>
-            Bienvenue, {userData.username} !
-          </Text>
-          <Text style={styles.levelText}>Niveau {userData.level}</Text>
-          
-          {/* Barre de progression XP */}
-          <View style={styles.xpBarContainer}>
-            <View style={[styles.xpBar, { width: `${xpProgress}%` }]} />
-          </View>
-          <Text style={styles.xpText}>
-            {userData.xpProgress} / {userData.xpToNextLevel} XP
-          </Text>
-        </View>
       </View>
 
-      {/* Statistiques du personnage */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>📊 Statistiques</Text>
-        <View style={styles.statsGrid}>
-          {Object.entries(STAT_CONFIG).map(([key, config]) => (
-            <View key={key} style={styles.statItem}>
-              <Text style={styles.statIcon}>{config.icon}</Text>
-              <Text style={styles.statLabel}>{config.label}</Text>
-              <Text style={[styles.statValue, { color: config.color }]}>
-                {userData.stats?.[key] || 0}
-              </Text>
-            </View>
-          ))}
-        </View>
+      {/* Carte de personnage RPG */}
+      <View style={styles.characterCardContainer}>
+        <CharacterCard
+          user={characterUser}
+          stats={characterStats}
+          streak={currentStreak}
+        />
       </View>
 
-      {/* Progression du jour (Daily Progress Bar) */}
+      {/* Progression quotidienne */}
       {dailyProgress && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📈 Progression du jour</Text>
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBarBg}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  { width: `${dailyProgress.percentage}%` }
-                ]}
-              />
-            </View>
-            <Text style={styles.progressLabel}>
-              {dailyProgress.message}
-            </Text>
-          </View>
+        <View style={styles.sectionContainer}>
+          <DailyProgress
+            goal={dailyProgress.goal}
+            completed={dailyProgress.completed}
+            percentage={dailyProgress.percentage}
+          />
         </View>
       )}
 
-      {/* Résumé hebdomadaire (Weekly Summary) */}
+      {/* Quêtes actives (section compacte) */}
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>⚔️ Quêtes actives ({quests?.active || 0})</Text>
+            <TouchableOpacity onPress={() => navigation?.navigate('Quests')}>
+              <Text style={styles.seeAllText}>→</Text>
+            </TouchableOpacity>
+          </View>
+
+          {quests?.upcoming && quests.upcoming.length > 0 ? (
+            quests.upcoming.slice(0, 2).map((quest: any) => (
+              <View key={quest.id} style={styles.questItem}>
+                <Text style={styles.questTitle}>• {quest.title}</Text>
+                <Text style={styles.questXp}>+{quest.xpReward} XP</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.emptyText}>Aucune quête active</Text>
+          )}
+        </View>
+      </View>
+
+      {/* Résumé hebdomadaire compact */}
       {weeklySummary && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📅 Résumé de la semaine</Text>
-          <View style={styles.weeklyGrid}>
-            <View style={styles.weeklyItem}>
-              <Text style={styles.weeklyIcon}>⚔️</Text>
-              <Text style={styles.weeklyValue}>{weeklySummary.questsCompleted}</Text>
-              <Text style={styles.weeklyLabel}>Quêtes</Text>
-            </View>
-            <View style={styles.weeklyItem}>
-              <Text style={styles.weeklyIcon}>🔥</Text>
-              <Text style={styles.weeklyValue}>{weeklySummary.habitsAverageStreak}</Text>
-              <Text style={styles.weeklyLabel}>Streak moy.</Text>
-            </View>
-            <View style={styles.weeklyItem}>
-              <Text style={styles.weeklyIcon}>📓</Text>
-              <Text style={styles.weeklyValue}>{weeklySummary.journalEntries}</Text>
-              <Text style={styles.weeklyLabel}>Entrées</Text>
-            </View>
-            <View style={styles.weeklyItem}>
-              <Text style={styles.weeklyIcon}>⭐</Text>
-              <Text style={styles.weeklyValue}>{weeklySummary.xpEarned}</Text>
-              <Text style={styles.weeklyLabel}>XP gagné</Text>
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>📅 Cette semaine</Text>
+            <View style={styles.weeklyCompactGrid}>
+              <View style={styles.weeklyCompactItem}>
+                <Text style={styles.weeklyCompactValue}>
+                  {weeklySummary.questsCompleted}
+                </Text>
+                <Text style={styles.weeklyCompactLabel}>⚔️ Quêtes</Text>
+              </View>
+              <View style={styles.weeklyCompactItem}>
+                <Text style={styles.weeklyCompactValue}>
+                  {weeklySummary.habitCompletions}
+                </Text>
+                <Text style={styles.weeklyCompactLabel}>🔄 Habitudes</Text>
+              </View>
+              <View style={styles.weeklyCompactItem}>
+                <Text style={styles.weeklyCompactValue}>
+                  {weeklySummary.journalEntries}
+                </Text>
+                <Text style={styles.weeklyCompactLabel}>📓 Entrées</Text>
+              </View>
+              <View style={styles.weeklyCompactItem}>
+                <Text style={styles.weeklyCompactValue}>
+                  {weeklySummary.xpEarned}
+                </Text>
+                <Text style={styles.weeklyCompactLabel}>⭐ XP</Text>
+              </View>
             </View>
           </View>
         </View>
       )}
-
-      {/* Résumé des quêtes */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>⚔️ Quêtes</Text>
-          <TouchableOpacity onPress={() => navigation?.navigate('Quests')}>
-            <Text style={styles.seeAllText}>Voir tout →</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.questsRow}>
-          <View style={styles.questStat}>
-            <Text style={styles.questStatNumber}>{quests.active}</Text>
-            <Text style={styles.questStatLabel}>En cours</Text>
-          </View>
-          <View style={styles.questStatDivider} />
-          <View style={styles.questStat}>
-            <Text style={styles.questStatNumber}>{quests.completed}</Text>
-            <Text style={styles.questStatLabel}>Terminées</Text>
-          </View>
-          <View style={styles.questStatDivider} />
-          <View style={styles.questStat}>
-            <Text style={[styles.questStatNumber, { color: '#f39c12' }]}>
-              {quests.dueSoon}
-            </Text>
-            <Text style={styles.questStatLabel}>Bientôt dues</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Résumé des habitudes */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>🔄 Habitudes</Text>
-          <TouchableOpacity onPress={() => navigation?.navigate('Habits')}>
-            <Text style={styles.seeAllText}>Voir tout →</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.habitsRow}>
-          <View style={styles.habitStat}>
-            <Text style={styles.habitStatNumber}>
-              {habits.completedToday}/{habits.total}
-            </Text>
-            <Text style={styles.habitStatLabel}>Aujourd'hui</Text>
-          </View>
-          
-          {habits.bestStreak > 0 && (
-            <View style={styles.streakBadge}>
-              <Text style={styles.streakEmoji}>🔥</Text>
-              <Text style={styles.streakText}>
-                Meilleur streak: {habits.bestStreak} jours
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      {/* Humeur du journal */}
-      {journal.todayMood && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📓 Journal</Text>
-          <View style={styles.moodCard}>
-            <Text style={styles.moodEmoji}>
-              {MOOD_EMOJIS[journal.todayMood]}
-            </Text>
-            <Text style={styles.moodLabel}>Humeur d'aujourd'hui</Text>
-          </View>
-          {journal.weeklyAverage && (
-            <Text style={styles.weeklyMood}>
-              📈 Moyenne de la semaine : {journal.weeklyAverage.toFixed(1)}/5
-            </Text>
-          )}
-        </View>
-      )}
-
-      {/* Conseils personnalisés */}
-      {tips && tips.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>💡 Conseils</Text>
-          {tips.map((tip: string, index: number) => (
-            <View key={index} style={styles.tipCard}>
-              <Text style={styles.tipText}>{tip}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* Boutons d'action rapide */}
-      <View style={styles.quickActions}>
-        <TouchableOpacity 
-          style={[styles.quickActionButton, { backgroundColor: '#6c5ce7' }]}
-          onPress={() => navigation?.navigate('CreateQuest')}
-        >
-          <Text style={styles.quickActionIcon}>⚔️</Text>
-          <Text style={styles.quickActionText}>Nouvelle quête</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.quickActionButton, { backgroundColor: '#00b894' }]}
-          onPress={() => navigation?.navigate('CreateHabit')}
-        >
-          <Text style={styles.quickActionIcon}>🔄</Text>
-          <Text style={styles.quickActionText}>Nouvelle habitude</Text>
-        </TouchableOpacity>
-      </View>
 
       <View style={styles.bottomSpacer} />
-    </ScrollView>
+      </ScrollView>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#0a0a1a', // Fond sombre
+  },
+  scrollContent: {
+    paddingBottom: 20,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#0a0a1a',
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666',
+    color: '#b8b8b8',
   },
   errorText: {
     fontSize: 16,
-    color: '#e74c3c',
+    color: '#ff4757',
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#6c5ce7',
+    backgroundColor: '#e94560',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -358,290 +267,110 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    padding: 20,
-    paddingTop: 40,
-    backgroundColor: '#6c5ce7',
-  },
-  avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 20,
   },
-  avatarEmoji: {
-    fontSize: 40,
-  },
-  achievementsButton: {
-    position: 'absolute',
-    top: 45,
-    right: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  achievementsButtonText: {
-    fontSize: 24,
-  },
-  leaderboardButton: {
-    position: 'absolute',
-    top: 45,
-    right: 75,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  leaderboardButtonText: {
-    fontSize: 24,
-  },
-  headerInfo: {
-    flex: 1,
-    marginLeft: 16,
-    justifyContent: 'center',
-  },
-  welcomeText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  levelText: {
+  headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 2,
+    color: '#eaeaea',
   },
-  xpBarContainer: {
-    height: 8,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 4,
-    marginTop: 8,
-    overflow: 'hidden',
+  notificationButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  xpBar: {
-    height: '100%',
-    backgroundColor: '#00b894',
-    borderRadius: 4,
+  notificationIcon: {
+    fontSize: 20,
   },
-  xpText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 4,
-  },
-  section: {
-    backgroundColor: '#fff',
+  characterCardContainer: {
     marginHorizontal: 16,
-    marginTop: 16,
-    padding: 16,
+    marginBottom: 20,
+  },
+  sectionContainer: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  sectionCard: {
+    backgroundColor: '#16213e',
     borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#2d2d44',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#2d3436',
-    marginBottom: 12,
+    fontWeight: 'bold',
+    color: '#eaeaea',
   },
   seeAllText: {
-    fontSize: 14,
-    color: '#6c5ce7',
-    fontWeight: '500',
+    fontSize: 24,
+    color: '#FFD700',
+    fontWeight: 'bold',
   },
-  statsGrid: {
+  questItem: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
-  },
-  statItem: {
-    width: '18%',
     alignItems: 'center',
     paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
   },
-  statIcon: {
-    fontSize: 24,
-  },
-  statLabel: {
-    fontSize: 10,
-    color: '#636e72',
-    marginTop: 4,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 2,
-  },
-  questsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  questStat: {
-    alignItems: 'center',
+  questTitle: {
+    fontSize: 14,
+    color: '#b8b8b8',
     flex: 1,
   },
-  questStatNumber: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#6c5ce7',
-  },
-  questStatLabel: {
+  questXp: {
     fontSize: 12,
-    color: '#636e72',
-    marginTop: 4,
+    color: '#FFD700',
+    fontWeight: 'bold',
   },
-  questStatDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: '#eee',
+  emptyText: {
+    fontSize: 14,
+    color: '#6c757d',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 10,
   },
-  habitsRow: {
+  weeklyCompactGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  habitStat: {
-    alignItems: 'center',
-  },
-  habitStatNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#00b894',
-  },
-  habitStatLabel: {
-    fontSize: 12,
-    color: '#636e72',
-    marginTop: 4,
-  },
-  streakBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff3e0',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  streakEmoji: {
-    fontSize: 18,
-    marginRight: 6,
-  },
-  streakText: {
-    fontSize: 13,
-    color: '#e65100',
-    fontWeight: '500',
-  },
-  moodCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 12,
-  },
-  moodEmoji: {
-    fontSize: 40,
-    marginRight: 16,
-  },
-  moodLabel: {
-    fontSize: 16,
-    color: '#2d3436',
-  },
-  weeklyMood: {
-    fontSize: 13,
-    color: '#636e72',
     marginTop: 12,
-    textAlign: 'center',
   },
-  tipCard: {
-    backgroundColor: '#e8f5e9',
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  tipText: {
-    fontSize: 14,
-    color: '#2e7d32',
-    lineHeight: 20,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginTop: 16,
-    gap: 12,
-  },
-  quickActionButton: {
+  weeklyCompactItem: {
+    alignItems: 'center',
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
   },
-  quickActionIcon: {
-    fontSize: 20,
-    marginRight: 8,
-  },
-  quickActionText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  bottomSpacer: {
-    height: 40,
-  },
-  progressContainer: {
-    marginTop: 8,
-  },
-  progressBarBg: {
-    height: 12,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#00b894',
-    borderRadius: 6,
-  },
-  progressLabel: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#2d3436',
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  weeklyGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 8,
-  },
-  weeklyItem: {
-    alignItems: 'center',
-  },
-  weeklyIcon: {
-    fontSize: 24,
+  weeklyCompactValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFD700',
     marginBottom: 4,
   },
-  weeklyValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#6c5ce7',
-  },
-  weeklyLabel: {
+  weeklyCompactLabel: {
     fontSize: 11,
-    color: '#636e72',
-    marginTop: 2,
+    color: '#b8b8b8',
+    textAlign: 'center',
+  },
+  bottomSpacer: {
+    height: 20,
   },
 });
