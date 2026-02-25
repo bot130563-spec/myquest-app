@@ -19,6 +19,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 // Alert compatible web
 const showAlert = (title: string, message: string) => {
@@ -118,7 +119,9 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
           {/* 🎮 HEADER */}
           {/* ══════════════════════════════════ */}
           <View style={styles.header}>
-            <Text style={styles.logo}>⚔️</Text>
+            <View style={styles.logoContainer}>
+              <Ionicons name="shield" size={56} color="#6c5ce7" />
+            </View>
             <Text style={styles.title}>Rejoins l'aventure!</Text>
             <Text style={styles.subtitle}>Crée ton compte et commence ta quête</Text>
           </View>
@@ -264,9 +267,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 32,
   },
-  logo: {
-    fontSize: 56,
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
+    borderWidth: 3,
+    borderColor: colors.accent,
   },
   title: {
     fontSize: 28,

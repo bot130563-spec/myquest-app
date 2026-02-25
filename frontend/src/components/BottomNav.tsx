@@ -12,14 +12,15 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 
 // Configuration des onglets
 const TABS = [
-  { name: 'Dashboard', icon: '🏠', label: 'Accueil' },
-  { name: 'Quests', icon: '⚔️', label: 'Quêtes' },
-  { name: 'Journal', icon: '📓', label: 'Journal' },
-  { name: 'Habits', icon: '🔄', label: 'Habitudes' },
-];
+  { name: 'Dashboard', icon: 'home', label: 'Accueil' },
+  { name: 'Quests', icon: 'flag', label: 'Quêtes' },
+  { name: 'Journal', icon: 'book', label: 'Journal' },
+  { name: 'Habits', icon: 'repeat', label: 'Habitudes' },
+] as const;
 
 export default function BottomNav() {
   const navigation = useNavigation<any>();
@@ -36,7 +37,11 @@ export default function BottomNav() {
             style={styles.tab}
             onPress={() => navigation.navigate(tab.name)}
           >
-            <Text style={styles.tabIcon}>{tab.icon}</Text>
+            <Ionicons
+              name={tab.icon}
+              size={24}
+              color={isActive ? '#6c5ce7' : '#999'}
+            />
             <Text style={[
               styles.tabLabel,
               isActive && styles.tabLabelActive,
@@ -65,9 +70,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     position: 'relative',
-  },
-  tabIcon: {
-    fontSize: 24,
   },
   tabLabel: {
     fontSize: 11,

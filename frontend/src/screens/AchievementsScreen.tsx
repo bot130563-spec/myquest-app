@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { api } from '../config/api';
 
@@ -97,13 +98,13 @@ export default function AchievementsScreen() {
 
   // Grouper par catégorie
   const categories = [
-    { id: 'streak', name: '🔥 Streaks', achievements: achievements.filter(a => a.category === 'streak') },
-    { id: 'quests', name: '⚔️ Quêtes', achievements: achievements.filter(a => a.category === 'quests') },
-    { id: 'habits', name: '🔄 Habitudes', achievements: achievements.filter(a => a.category === 'habits') },
-    { id: 'journal', name: '📓 Journal', achievements: achievements.filter(a => a.category === 'journal') },
-    { id: 'stats', name: '📊 Stats', achievements: achievements.filter(a => a.category === 'stats') },
-    { id: 'special', name: '⭐ Spécial', achievements: achievements.filter(a => a.category === 'special') },
-  ];
+    { id: 'streak', name: 'Streaks', icon: 'fire', iconLibrary: 'MaterialCommunityIcons', achievements: achievements.filter(a => a.category === 'streak') },
+    { id: 'quests', name: 'Quêtes', icon: 'flag', iconLibrary: 'Ionicons', achievements: achievements.filter(a => a.category === 'quests') },
+    { id: 'habits', name: 'Habitudes', icon: 'repeat', iconLibrary: 'Ionicons', achievements: achievements.filter(a => a.category === 'habits') },
+    { id: 'journal', name: 'Journal', icon: 'book', iconLibrary: 'Ionicons', achievements: achievements.filter(a => a.category === 'journal') },
+    { id: 'stats', name: 'Stats', icon: 'stats-chart', iconLibrary: 'Ionicons', achievements: achievements.filter(a => a.category === 'stats') },
+    { id: 'special', name: 'Spécial', icon: 'star', iconLibrary: 'Ionicons', achievements: achievements.filter(a => a.category === 'special') },
+  ] as const;
 
   if (loading) {
     return (
@@ -133,7 +134,10 @@ export default function AchievementsScreen() {
         {/* 🏆 HEADER */}
         {/* ══════════════════════════════════ */}
         <View style={styles.header}>
-          <Text style={styles.title}>🏆 Achievements</Text>
+          <View style={styles.titleContainer}>
+            <Ionicons name="trophy" size={32} color={colors.accent} />
+            <Text style={styles.title}>Achievements</Text>
+          </View>
           <Text style={styles.subtitle}>Tes accomplissements de héros</Text>
         </View>
 
@@ -168,7 +172,10 @@ export default function AchievementsScreen() {
           {checking ? (
             <ActivityIndicator size="small" color={colors.textLight} />
           ) : (
-            <Text style={styles.checkButtonText}>🔍 Vérifier mes achievements</Text>
+            <View style={styles.checkButtonContent}>
+              <Ionicons name="search" size={20} color={colors.textLight} />
+              <Text style={styles.checkButtonText}>Vérifier mes achievements</Text>
+            </View>
           )}
         </TouchableOpacity>
 
@@ -177,7 +184,10 @@ export default function AchievementsScreen() {
         {/* ══════════════════════════════════ */}
         {newlyUnlocked.length > 0 && (
           <View style={styles.newlyUnlockedCard}>
-            <Text style={styles.newlyUnlockedTitle}>🎉 Nouveaux achievements !</Text>
+            <View style={styles.newlyUnlockedTitleContainer}>
+              <Ionicons name="gift" size={20} color={colors.success} />
+              <Text style={styles.newlyUnlockedTitle}>Nouveaux achievements !</Text>
+            </View>
             {newlyUnlocked.map(a => (
               <View key={a.id} style={styles.newAchievement}>
                 <Text style={styles.newAchievementIcon}>{a.icon}</Text>
@@ -199,7 +209,14 @@ export default function AchievementsScreen() {
         {categories.map(cat => (
           cat.achievements.length > 0 && (
             <View key={cat.id} style={styles.categorySection}>
-              <Text style={styles.categoryTitle}>{cat.name}</Text>
+              <View style={styles.categoryTitleContainer}>
+                {cat.iconLibrary === 'MaterialCommunityIcons' ? (
+                  <MaterialCommunityIcons name={cat.icon} size={20} color={colors.accent} />
+                ) : (
+                  <Ionicons name={cat.icon} size={20} color={colors.accent} />
+                )}
+                <Text style={styles.categoryTitle}>{cat.name}</Text>
+              </View>
               <View style={styles.achievementsGrid}>
                 {cat.achievements.map(achievement => (
                   <View
@@ -271,6 +288,11 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 24,
   },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
@@ -318,6 +340,11 @@ const styles = StyleSheet.create({
   checkButtonDisabled: {
     opacity: 0.7,
   },
+  checkButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   checkButtonText: {
     color: colors.textLight,
     fontSize: 16,
@@ -333,11 +360,16 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.success,
   },
+  newlyUnlockedTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
   newlyUnlockedTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.success,
-    marginBottom: 12,
   },
   newAchievement: {
     flexDirection: 'row',
@@ -370,11 +402,16 @@ const styles = StyleSheet.create({
   categorySection: {
     marginBottom: 24,
   },
+  categoryTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
   categoryTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.textLight,
-    marginBottom: 12,
   },
   achievementsGrid: {
     flexDirection: 'row',

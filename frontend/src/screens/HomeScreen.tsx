@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -89,11 +90,14 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         <View style={styles.card}>
           <View style={styles.levelHeader}>
             <Text style={styles.levelBadge}>Niv. {avatar?.level || 1}</Text>
-            <Text style={styles.avatarType}>
-              {avatar?.avatarType === 'warrior' ? '⚔️ Guerrier' : 
-               avatar?.avatarType === 'mage' ? '🔮 Mage' :
-               avatar?.avatarType === 'healer' ? '💚 Soigneur' : '⚔️ Guerrier'}
-            </Text>
+            <View style={styles.avatarTypeContainer}>
+              <Ionicons name="shield" size={16} color={colors.textSecondary} />
+              <Text style={styles.avatarType}>
+                {avatar?.avatarType === 'warrior' ? 'Guerrier' :
+                 avatar?.avatarType === 'mage' ? 'Mage' :
+                 avatar?.avatarType === 'healer' ? 'Soigneur' : 'Guerrier'}
+              </Text>
+            </View>
           </View>
           
           {/* Barre de progression XP */}
@@ -101,9 +105,12 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             <View style={styles.xpBarBackground}>
               <View style={[styles.xpBarFill, { width: `${xpProgress}%` }]} />
             </View>
-            <Text style={styles.xpText}>
-              ✨ {avatar?.experience || 0} / {xpForNextLevel} XP
-            </Text>
+            <View style={styles.xpTextContainer}>
+              <Ionicons name="sparkles" size={16} color={colors.accent} />
+              <Text style={styles.xpText}>
+                {avatar?.experience || 0} / {xpForNextLevel} XP
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -111,44 +118,47 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         {/* 📊 CARTE STATS - Statistiques de vie */}
         {/* ═══════════════════════════════════════ */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>📊 Tes Stats de Vie</Text>
+          <View style={styles.cardTitleContainer}>
+            <Ionicons name="stats-chart" size={20} color={colors.accent} />
+            <Text style={styles.cardTitle}>Tes Stats de Vie</Text>
+          </View>
           
           <View style={styles.statsGrid}>
-            <StatBar 
-              label="Santé" 
-              value={stats?.health || 50} 
+            <StatBar
+              label="Santé"
+              value={stats?.health || 50}
               color={colors.healthBar}
-              icon="💪"
+              icon="fitness"
             />
-            <StatBar 
-              label="Énergie" 
-              value={stats?.energy || 50} 
+            <StatBar
+              label="Énergie"
+              value={stats?.energy || 50}
               color={colors.energyBar}
-              icon="⚡"
+              icon="flash"
             />
-            <StatBar 
-              label="Sagesse" 
-              value={stats?.wisdom || 50} 
+            <StatBar
+              label="Sagesse"
+              value={stats?.wisdom || 50}
               color={colors.wisdomBar}
-              icon="📚"
+              icon="book"
             />
-            <StatBar 
-              label="Social" 
-              value={stats?.social || 50} 
+            <StatBar
+              label="Social"
+              value={stats?.social || 50}
               color={colors.socialBar}
-              icon="👥"
+              icon="people"
             />
-            <StatBar 
-              label="Finances" 
-              value={stats?.wealth || 50} 
+            <StatBar
+              label="Finances"
+              value={stats?.wealth || 50}
               color={colors.wealthBar}
-              icon="💰"
+              icon="cash"
             />
           </View>
           
           {/* Streak */}
           <View style={styles.streakContainer}>
-            <Text style={styles.streakIcon}>🔥</Text>
+            <MaterialCommunityIcons name="fire" size={24} color={colors.accent} />
             <Text style={styles.streakText}>
               Streak: {stats?.currentStreak || 0} jour{(stats?.currentStreak || 0) > 1 ? 's' : ''}
             </Text>
@@ -162,27 +172,33 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         {/* 🎯 CARTE ACTIONS - Boutons rapides */}
         {/* ═══════════════════════════════════════ */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>🎯 Actions Rapides</Text>
-          
-          <TouchableOpacity 
+          <View style={styles.cardTitleContainer}>
+            <Ionicons name="rocket" size={20} color={colors.accent} />
+            <Text style={styles.cardTitle}>Actions Rapides</Text>
+          </View>
+
+          <TouchableOpacity
             style={styles.actionButton}
             onPress={() => navigation.navigate('Habits')}
           >
-            <Text style={styles.actionButtonText}>🔄 Habitudes du jour</Text>
+            <Ionicons name="repeat" size={20} color={colors.textLight} />
+            <Text style={styles.actionButtonText}>Habitudes du jour</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={[styles.actionButton, styles.secondaryButton]}
             onPress={() => navigation.navigate('Quests')}
           >
-            <Text style={styles.secondaryButtonText}>⚔️ Mes Quêtes</Text>
+            <Ionicons name="flag" size={20} color={colors.textSecondary} />
+            <Text style={styles.secondaryButtonText}>Mes Quêtes</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={[styles.actionButton, styles.secondaryButton]}
             onPress={() => navigation.navigate('CreateQuest')}
           >
-            <Text style={styles.secondaryButtonText}>+ Nouvelle Quête</Text>
+            <Ionicons name="add-circle" size={20} color={colors.textSecondary} />
+            <Text style={styles.secondaryButtonText}>Nouvelle Quête</Text>
           </TouchableOpacity>
         </View>
 
@@ -200,7 +216,8 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         {/* 🚪 DÉCONNEXION */}
         {/* ═══════════════════════════════════════ */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>🚪 Déconnexion</Text>
+          <Ionicons name="log-out-outline" size={16} color={colors.textMuted} />
+          <Text style={styles.logoutText}>Déconnexion</Text>
         </TouchableOpacity>
         
       </ScrollView>
@@ -223,7 +240,10 @@ function StatBar({ label, value, color, icon }: StatBarProps) {
   return (
     <View style={styles.statBarContainer}>
       <View style={styles.statBarHeader}>
-        <Text style={styles.statBarLabel}>{icon} {label}</Text>
+        <View style={styles.statBarLabelContainer}>
+          <Ionicons name={icon as any} size={16} color={color} />
+          <Text style={styles.statBarLabel}>{label}</Text>
+        </View>
         <Text style={styles.statBarValue}>{value}</Text>
       </View>
       <View style={styles.statBarBackground}>
@@ -270,11 +290,16 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 16,
   },
+  cardTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
   cardTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: colors.textLight,
-    marginBottom: 16,
   },
   
   // Level & XP
@@ -294,6 +319,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     overflow: 'hidden',
   },
+  avatarTypeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   avatarType: {
     color: colors.textSecondary,
     fontSize: 14,
@@ -312,10 +342,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.xpBar,
     borderRadius: 6,
   },
+  xpTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
   xpText: {
     color: colors.textMuted,
     fontSize: 14,
-    textAlign: 'center',
   },
   
   // Stats Grid
@@ -329,6 +364,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 4,
+  },
+  statBarLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   statBarLabel: {
     color: colors.textSecondary,
@@ -361,9 +401,6 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     gap: 8,
   },
-  streakIcon: {
-    fontSize: 24,
-  },
   streakText: {
     color: colors.textLight,
     fontSize: 16,
@@ -376,10 +413,13 @@ const styles = StyleSheet.create({
   
   // Actions
   actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     backgroundColor: colors.accent,
     borderRadius: 12,
     padding: 16,
-    alignItems: 'center',
     marginBottom: 12,
   },
   actionButtonText: {
@@ -422,7 +462,10 @@ const styles = StyleSheet.create({
   
   // Logout
   logoutButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
     padding: 16,
     marginBottom: 20,
   },
