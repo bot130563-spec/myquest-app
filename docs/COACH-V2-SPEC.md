@@ -11,12 +11,45 @@ Un coach structuré hybride : questionnaire rapide d'onboarding (6 questions) + 
 - **Psychologie jungienne** — ombre, individuation, archétypes
 - **Monomythe** (Joseph Campbell) — voyage du héros
 
+## Les 7 Dimensions de Vie
+
+| Stat | Emoji | Couvre |
+|------|-------|--------|
+| **Corps** | 💪 | Santé physique, sport, sommeil, alimentation |
+| **Esprit** | 🧠 | Santé mentale, émotions, stress, paix intérieure |
+| **Sagesse** | 📚 | Apprentissage, connaissance de soi, introspection |
+| **Social** | 👥 | Amis, famille, réseau, vie sociale |
+| **Amour** | ❤️ | Couple, intimité, connexion profonde (optionnel — l'utilisateur choisit d'en parler ou non) |
+| **Carrière** | 🎯 | Travail, projets, ambition, compétences, purpose |
+| **Finances** | 💰 | Argent, patrimoine, sécurité financière |
+
+### Sagesse = méta-stat
+L'introspection fait monter **Wisdom** directement. Mais la Sagesse a un effet de **répercussion sur tous les domaines** :
+- Plus le profil est clair (wisdom haute) → plus le coach a une vision globale de l'utilisateur
+- Plus la vision est globale → plus les projets proposés sont **pertinents, réalistes, adaptés et évolutifs**
+- Les projets impactent ensuite Corps, Esprit, Social, Amour, Carrière, Finances selon leur nature
+
+**Flywheel : plus tu te connais → meilleurs sont tes projets → plus tu progresses partout.**
+
+### Limites du Coach (santé mentale)
+Le coach est un outil de **développement personnel**, PAS un thérapeute :
+- Il peut explorer les émotions et patterns dans le cadre de l'introspection
+- Il NE pose PAS de diagnostic (dépression, anxiété, trauma, etc.)
+- Si l'utilisateur exprime une détresse importante, le coach :
+  1. Valide l'émotion avec empathie
+  2. Rappelle qu'il n'est pas un professionnel de santé mentale
+  3. Suggère de consulter un psychologue ou thérapeute
+  4. Propose de continuer sur un sujet où il peut aider
+- Il ne prescrit jamais de médicaments, régimes, ou traitements
+- Il ne pousse jamais l'utilisateur au-delà de ce qu'il est prêt à explorer
+
 ## Principes
 1. **Mémoire persistante** — Les réponses sont stockées en DB. Le LLM charge le profil complet au début de chaque session.
 2. **Détection des zones d'ombre** — Le modèle analyse le profil et identifie ce qui est vague, contradictoire ou inexploré.
 3. **Sessions transparentes** — Auto-save à chaque message. Quitter l'onglet = pause automatique. Reprendre = dashboard d'avancement + résultats clés.
-4. **Sagesse = introspection** — La stat `wisdom` augmente avec la profondeur et la quantité d'introspection.
+4. **Sagesse = méta-stat** — L'introspection fait monter `wisdom` et se répercute sur tous les domaines via la pertinence des projets proposés.
 5. **Introspection → Projets** — Le coach transforme la connaissance de soi en projets concrets via un dialogue collaboratif.
+6. **Vision globale** — Le coach doit avoir une compréhension complète de l'utilisateur (7 dimensions) pour proposer des projets adaptés à sa situation réelle.
 
 ---
 
@@ -269,6 +302,10 @@ Tu es le Coach MyQuest, un expert en développement personnel.
 ## Historique de la session en cours
 {session_messages}
 
+## Les 7 dimensions de vie
+Corps (💪), Esprit (🧠), Sagesse (📚), Social (👥), Amour (❤️), Carrière (🎯), Finances (💰)
+Tu dois construire une vision GLOBALE de l'utilisateur sur ces 7 dimensions pour proposer des projets pertinents, réalistes, adaptés et évolutifs.
+
 ## Règles d'interaction
 1. UNE question à la fois, jamais de liste
 2. Reformuler ce que l'utilisateur dit avant de creuser
@@ -277,6 +314,14 @@ Tu es le Coach MyQuest, un expert en développement personnel.
 5. Utiliser le prénom de l'utilisateur
 6. Être fluide et humain — pas de structure rigide visible
 7. Cibler les zones floues en priorité
+8. Amour (❤️) : n'aborder que si l'utilisateur en parle de lui-même
+
+## Limites (STRICTES)
+- Tu es un coach de développement personnel, PAS un thérapeute
+- JAMAIS de diagnostic (dépression, anxiété, trauma, trouble)
+- Si détresse importante : valider l'émotion → rappeler que tu n'es pas un professionnel de santé → suggérer de consulter un psy/thérapeute → proposer de continuer sur un autre sujet
+- JAMAIS de prescription (médicaments, régimes, traitements)
+- Ne JAMAIS pousser l'utilisateur au-delà de ce qu'il est prêt à explorer
 
 ## Règles pour les projets
 - Ne proposer un projet que quand l'insight est mûre (pas trop tôt)
@@ -394,18 +439,56 @@ Body: `{ message: string }`
 
 ---
 
-## Mapping Stats
+## Mapping Stats (7 dimensions)
 
-| Zone du profil | Stat principale | Stats secondaires |
-|---------------|----------------|-------------------|
-| values | wisdom | - |
-| strengths | energy | wisdom |
-| shadows | wisdom | health |
-| chaosOrder | energy | wisdom |
-| vision | wisdom | wealth |
-| Projet remédiation | Selon le projet | wisdom |
-| Projet amplification | Selon le projet | energy |
-| Projet confrontation | Selon le projet | health, social |
+### DB Schema — Stats (mise à jour)
+```prisma
+model Stats {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  
+  // Les 7 dimensions (0-100)
+  body          Int      @default(50)  // 💪 Corps
+  mind          Int      @default(50)  // 🧠 Esprit
+  wisdom        Int      @default(50)  // 📚 Sagesse
+  social        Int      @default(50)  // 👥 Social
+  love          Int      @default(50)  // ❤️ Amour
+  career        Int      @default(50)  // 🎯 Carrière
+  finance       Int      @default(50)  // 💰 Finances
+  
+  currentStreak  Int     @default(0)
+  longestStreak  Int     @default(0)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+```
+
+### Introspection → Wisdom (direct)
+| Zone du profil | Wisdom gain |
+|---------------|-------------|
+| values | +wisdom (comprendre ses valeurs) |
+| strengths | +wisdom (connaître ses forces) |
+| shadows | +wisdom (confronter son ombre) |
+| chaosOrder | +wisdom (comprendre son rapport au changement) |
+| vision | +wisdom (clarifier sa direction) |
+| Zone floue → claire | +10 wisdom bonus |
+
+### Projets → Toutes dimensions (indirect via wisdom)
+Le coach utilise le profil complet (nourri par wisdom) pour proposer des projets qui impactent la bonne dimension :
+
+| Type de projet | Stats impactées (exemples) |
+|---------------|---------------------------|
+| Remédiation "Vaincre sa timidité" | social +, mind + |
+| Amplification "Développer l'app de ses rêves" | career +, wisdom + |
+| Alignement "Side-project énergie verte" | career +, mind + |
+| Confrontation "Poser des limites" | social +, mind + |
+| Vision "Construire son réseau pro" | career +, social + |
+| Remédiation "Routine sport" | body +, mind + |
+| Vision "Lancer son business" | career +, finance + |
+
+Le LLM détermine les statsImpact au moment de la proposition, basé sur la nature du projet et le profil de l'utilisateur.
 
 ---
 
