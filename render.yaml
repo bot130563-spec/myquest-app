@@ -45,3 +45,23 @@ services:
     # Auto-deploy sur push main
     autoDeploy: true
     branch: main
+
+  # Frontend (Static Site)
+  - type: web
+    name: myquest-web
+    runtime: static
+    region: frankfurt
+    plan: free
+    rootDir: frontend
+    buildCommand: npx expo export --platform web --output-dir dist
+    staticPublishPath: dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    autoDeploy: true
+    branch: main
