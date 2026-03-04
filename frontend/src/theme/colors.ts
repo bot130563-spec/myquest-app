@@ -58,11 +58,18 @@ export const colors = {
   // Chaque stat de vie a sa couleur distinctive
   
   xpBar: '#9b59b6',        // Violet - Expérience générale
-  healthBar: '#e74c3c',    // Rouge - Santé physique 💪
-  energyBar: '#3498db',    // Bleu - Énergie mentale ⚡
-  wisdomBar: '#9b59b6',    // Violet - Sagesse/Connaissance 📚
-  socialBar: '#e91e63',    // Rose - Relations sociales 👥
-  wealthBar: '#f39c12',    // Orange/or - Finances 💰
+  // 7 dimensions de vie (Coach V2)
+  bodyBar: '#e74c3c',      // Rouge - Corps 💪
+  mindBar: '#3498db',      // Bleu - Esprit 🧠
+  wisdomBar: '#9b59b6',    // Violet - Sagesse 📚
+  socialBar: '#e91e63',    // Rose - Social 👥
+  loveBar: '#ff6b6b',      // Rouge clair - Amour ❤️
+  careerBar: '#f39c12',    // Orange - Carrière 🎯
+  financeBar: '#27ae60',   // Vert - Finances 💰
+  // Alias rétro-compatibles
+  healthBar: '#e74c3c',    // Alias → bodyBar
+  energyBar: '#3498db',    // Alias → mindBar
+  wealthBar: '#f39c12',    // Alias → financeBar
   
   // ============================================
   // 📝 COULEURS DE TEXTE

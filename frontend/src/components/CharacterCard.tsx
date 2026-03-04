@@ -13,11 +13,13 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface Stats {
-  health: number;
-  energy: number;
+  body: number;
+  mind: number;
   wisdom: number;
   social: number;
-  wealth: number;
+  love: number;
+  career: number;
+  finance: number;
 }
 
 interface User {
@@ -34,13 +36,15 @@ interface CharacterCardProps {
   streak: number;
 }
 
-// Configuration des stats avec icônes et couleurs
+// Configuration des 7 dimensions de vie
 const STAT_CONFIG = [
-  { key: 'health', iconType: 'Ionicons', iconName: 'heart', label: 'Santé', color: '#e74c3c', max: 100 },
-  { key: 'energy', iconType: 'Ionicons', iconName: 'flash', label: 'Énergie', color: '#f39c12', max: 100 },
-  { key: 'wisdom', iconType: 'Ionicons', iconName: 'book', label: 'Sagesse', color: '#3498db', max: 100 },
-  { key: 'social', iconType: 'Ionicons', iconName: 'people', label: 'Social', color: '#9b59b6', max: 100 },
-  { key: 'wealth', iconType: 'Ionicons', iconName: 'cash', label: 'Richesse', color: '#27ae60', max: 100 },
+  { key: 'body', iconType: 'Ionicons', iconName: 'fitness', label: 'Corps', color: '#e74c3c', max: 100 },
+  { key: 'mind', iconType: 'Ionicons', iconName: 'bulb', label: 'Esprit', color: '#3498db', max: 100 },
+  { key: 'wisdom', iconType: 'Ionicons', iconName: 'book', label: 'Sagesse', color: '#9b59b6', max: 100 },
+  { key: 'social', iconType: 'Ionicons', iconName: 'people', label: 'Social', color: '#e91e63', max: 100 },
+  { key: 'love', iconType: 'Ionicons', iconName: 'heart', label: 'Amour', color: '#ff6b6b', max: 100 },
+  { key: 'career', iconType: 'Ionicons', iconName: 'rocket', label: 'Carrière', color: '#f39c12', max: 100 },
+  { key: 'finance', iconType: 'Ionicons', iconName: 'cash', label: 'Finances', color: '#27ae60', max: 100 },
 ] as const;
 
 // Fonction pour déterminer l'emoji selon le niveau

@@ -117,11 +117,13 @@ export default function DashboardScreen({ navigation }: any) {
   };
 
   const characterStats = {
-    health: stats?.health || 50,
-    energy: stats?.energy || 50,
+    body: stats?.body || 50,
+    mind: stats?.mind || 50,
     wisdom: stats?.wisdom || 50,
     social: stats?.social || 50,
-    wealth: stats?.wealth || 50,
+    love: stats?.love || 50,
+    career: stats?.career || 50,
+    finance: stats?.finance || 50,
   };
 
   const currentStreak = stats?.currentStreak || 0;
