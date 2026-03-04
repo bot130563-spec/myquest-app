@@ -1,13 +1,22 @@
 # Coach V2 — Spécification Technique
 
 ## Vision
-Un coach structuré hybride : questionnaire rapide d'onboarding (5-6 questions) + approfondissement conversationnel via LLM. Le coach détecte les zones floues du profil et guide l'utilisateur vers plus de clarté. Chaque session d'introspection fait monter la stat **Sagesse**.
+Un coach structuré hybride : questionnaire rapide d'onboarding (6 questions) + approfondissement conversationnel via LLM. Le coach détecte les zones floues du profil et guide l'utilisateur vers plus de clarté. L'introspection débouche sur des **projets concrets** proposés par l'IA en collaboration avec l'utilisateur. Chaque session d'introspection fait monter la stat **Sagesse**.
+
+## Cadre Théorique
+- **Maps of Meaning** (Jordan Peterson) — chaos/ordre, archétype du héros, construction du sens
+- **Self-Authoring** (Peterson) — écriture réflexive passé/présent/futur
+- **Atomic Habits** (James Clear) — transformation par les habitudes
+- **Logothérapie** (Viktor Frankl) — sens et responsabilité
+- **Psychologie jungienne** — ombre, individuation, archétypes
+- **Monomythe** (Joseph Campbell) — voyage du héros
 
 ## Principes
-1. **Mémoire persistante** — Les réponses sont stockées en DB. Le LLM les relit avant chaque interaction.
+1. **Mémoire persistante** — Les réponses sont stockées en DB. Le LLM charge le profil complet au début de chaque session.
 2. **Détection des zones d'ombre** — Le modèle analyse le profil et identifie ce qui est vague, contradictoire ou inexploré.
-3. **Sessions flexibles** — L'utilisateur commence et arrête quand il veut. Le coach reprend là où on en était.
+3. **Sessions transparentes** — Auto-save à chaque message. Quitter l'onglet = pause automatique. Reprendre = dashboard d'avancement + résultats clés.
 4. **Sagesse = introspection** — La stat `wisdom` augmente avec la profondeur et la quantité d'introspection.
+5. **Introspection → Projets** — Le coach transforme la connaissance de soi en projets concrets via un dialogue collaboratif.
 
 ---
 
@@ -31,10 +40,11 @@ model CoachProfile {
   summary     String?  // Portrait synthétique texte libre (par le LLM)
   
   // Tracking des zones floues
-  unclearZones Json?   // [{zone: "values", clarity: 0.3, reason: "réponses vagues"}]
+  // [{zone: "values", clarity: 0.3, reason: "réponses vagues sur ce qui le motive"}]
+  unclearZones Json?
   
   // Phase actuelle du coaching
-  currentPhase  Int    @default(1) // 1=connaissance, 2=vision, 3=habitudes, 4=action
+  currentPhase   Int     @default(1) // 1=connaissance, 2=vision, 3=habitudes, 4=action
   onboardingDone Boolean @default(false)
   
   createdAt   DateTime @default(now())
@@ -43,7 +53,7 @@ model CoachProfile {
 ```
 
 ### CoachSession
-Représente une session de coaching (start → stop).
+Représente une session de coaching (auto-saved, pause/resume transparente).
 
 ```prisma
 model CoachSession {
@@ -53,10 +63,13 @@ model CoachSession {
   
   status      String   @default("active") // active, paused, completed
   phase       Int      @default(1)
-  topic       String?  // Sujet principal de la session
+  topic       String?  // Sujet principal de la session (identifié par le LLM)
   
   // Sagesse gagnée dans cette session
   wisdomGained Int     @default(0)
+  
+  // Snapshot du profil au début de session (évite de recharger à chaque message)
+  profileSnapshot Json?
   
   messages    CoachMessage[]
   
@@ -78,11 +91,40 @@ model CoachMessage {
   role        String   // "user" | "coach" | "system"
   content     String
   
-  // Metadata pour le scoring
-  insightScore Int?    // 0-10, évalué par le LLM (profondeur de la réponse)
+  // Metadata pour le scoring (rempli par le LLM pour les messages "user")
+  insightScore Int?    // 0-10, profondeur de la réponse
   zone        String?  // Quelle zone du profil cette réponse concerne
   
   createdAt   DateTime @default(now())
+}
+```
+
+### CoachProjectProposal
+Proposition de projet générée par le coach, en attente de validation utilisateur.
+
+```prisma
+model CoachProjectProposal {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  sessionId   String?
+  
+  title       String
+  description String
+  why         String   // Lien avec le profil ("Issu de ton introspection sur...")
+  type        String   // remediation | amplification | alignment | confrontation | vision
+  
+  // Stats impactées
+  statsImpact Json?    // {wisdom: 2, social: 3, ...}
+  
+  // Status du flow
+  status      String   @default("proposed") // proposed | discussing | validated | rejected
+  
+  // Si validé, référence vers le Quest créé
+  questId     String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 ```
 
@@ -91,84 +133,179 @@ model CoachMessage {
 ## Flow Utilisateur
 
 ### 1. Premier lancement (Onboarding)
-1. L'utilisateur ouvre le Coach → écran d'intro expliquant le concept
+
+1. L'utilisateur ouvre le Coach → écran d'intro court expliquant le concept
 2. **Questionnaire rapide** (6 questions, une par écran, UX propre) :
-   - Q1: "Pense à un moment récent où tu t'es senti vraiment vivant. Que faisais-tu ?"
-   - Q2: "Qu'est-ce qui te met en colère quand tu le vois dans le monde ?"
-   - Q3: "Dans quoi les gens viennent-ils te demander de l'aide ?"
-   - Q4: "Quel trait de caractère tu sais que tu devrais changer, mais que tu repousses ?"
-   - Q5: "Face à l'inconnu, ta première réaction : fuir, réfléchir, ou foncer ?"
-   - Q6: "Imagine-toi dans 5 ans, ta meilleure version. Décris cette scène."
+   - Q1 [values]: "Pense à un moment récent où tu t'es senti vraiment vivant. Que faisais-tu ?"
+   - Q2 [values]: "Qu'est-ce qui te met en colère quand tu le vois dans le monde ?"
+   - Q3 [strengths]: "Dans quoi les gens viennent-ils te demander de l'aide ?"
+   - Q4 [shadows]: "Quel trait de caractère tu sais que tu devrais changer, mais que tu repousses ?"
+   - Q5 [chaosOrder]: "Face à l'inconnu, ta première réaction : fuir, réfléchir, ou foncer ?"
+   - Q6 [vision]: "Imagine-toi dans 5 ans, ta meilleure version. Décris cette scène."
 3. Les réponses sont stockées (CoachMessage avec zone taggée)
 4. Le LLM génère un **profil initial** (CoachProfile) + identifie les **zones floues**
-5. Le coach propose de commencer l'approfondissement ou de revenir plus tard
+5. **Transition transparente** vers le chat — le coach enchaîne naturellement avec une première question d'approfondissement basée sur la zone la plus floue
 
-### 2. Session de coaching (approfondissement)
-1. L'utilisateur clique "Commencer une session" → CoachSession créée (status: active)
-2. **Avant chaque message du coach**, le backend :
+### 2. Dashboard Coach (à l'ouverture de l'onglet)
+
+Quand l'utilisateur revient sur l'onglet Coach, il voit :
+- **Résumé du profil** — portrait synthétique en quelques lignes
+- **Avancement** — barre de progression par zone (values, strengths, shadows, chaosOrder, vision) avec indicateur de clarté (0-100%)
+- **Résultats clés** — les insights principales identifiées jusqu'ici
+- **Projets proposés** — projets en attente de validation
+- **Bouton "Continuer"** → reprend la session là où elle était
+
+### 3. Session de coaching (approfondissement)
+
+1. L'utilisateur clique "Continuer" → CoachSession créée ou reprise
+2. **Au début de la session**, le backend :
    - Charge le CoachProfile complet
-   - Charge les N derniers messages de la session en cours
    - Charge les unclearZones
-   - Envoie tout en contexte au LLM
-3. Le LLM :
-   - Reformule, questionne, approfondit les zones floues
-   - Note chaque réponse utilisateur (insightScore 0-10)
-   - Met à jour le profil si une nouvelle insight émerge
-4. L'utilisateur peut **quitter à tout moment** → session passe en "paused"
-5. Au retour → le coach résume où on en était et reprend
+   - Stocke un snapshot dans la session (profileSnapshot)
+   - Envoie au LLM pour générer le premier message de reprise
+3. **Pendant la session**, le LLM utilise :
+   - Le profileSnapshot (chargé une fois)
+   - Les messages de la session en cours (s'accumulent)
+   - Les unclearZones
+   - → Discussion fluide et humaine, pas de rechargement à chaque message
+4. **Auto-save** : chaque message est persisté immédiatement
+5. **Quitter l'onglet** = session passe en "paused" automatiquement (pas de bouton "terminer")
+6. Le profil est mis à jour en fin de session (ou quand le LLM signale un profileUpdate important)
 
-### 3. Scoring Sagesse
+### 4. Scoring Sagesse
+
 - Chaque réponse utilisateur est évaluée par le LLM (insightScore 0-10)
 - **Sagesse gagnée** = Σ(insightScores) de la session
 - Formule de conversion : `wisdomPoints = floor(totalInsightScore / 5)`
-- La stat `wisdom` du User.Stats est mise à jour en temps réel
-- Bonus si une zone passe de "floue" à "claire" (+10 wisdom)
+- La stat `wisdom` du User.Stats est mise à jour à chaque message
+- **Bonus** : quand une zone passe de "floue" (< 0.5) à "claire" (> 0.7) → +10 wisdom
+- L'utilisateur voit la progression en temps réel (animation subtile)
+
+---
+
+## Pipeline Introspection → Projets
+
+### Les 5 types de projets
+
+| Type | Source dans le profil | Logique | Exemple |
+|------|----------------------|---------|---------|
+| **🩹 Remédiation** | Shadows (faiblesses) | Attaquer la cause racine, pas le symptôme | "Timide" → root cause "ne sait pas structurer sa pensée" → Projet "Développer son éloquence" |
+| **🚀 Amplification** | Strengths (forces) | Pousser un talent au niveau supérieur | Fort en technique → Projet "Développer l'app de tes rêves" |
+| **🧭 Alignement** | Values vs réalité | Combler le gap entre valeurs et quotidien | Valeur "impact environnemental" + job non lié → Projet "Side-project énergie verte" |
+| **🐉 Confrontation** | ChaosOrder (dragons évités) | Le dragon cache le trésor (Maps of Meaning) | Évite les conflits → Projet "Apprendre à poser des limites" |
+| **🌉 Vision** | Vision (futur idéal) | Pont entre le moi actuel et le moi dans 5 ans | Vision "consultant reconnu" + réalité "salarié sans réseau" → Projet "Construire son réseau pro" |
+
+### Flow de génération (dialogue collaboratif en 6 étapes)
+
+Le coach ne propose JAMAIS un projet froid. C'est toujours un dialogue :
+
+```
+1. OBSERVATION — Le coach repère un pattern dans le profil
+   Coach: "J'ai remarqué que tu mentionnes souvent le besoin d'être 
+   écouté, mais tu dis aussi que tu as du mal à t'exprimer..."
+
+2. EXPLORATION — Il creuse avec l'utilisateur  
+   Coach: "Qu'est-ce qui se passe concrètement quand tu essaies 
+   de t'exprimer ? C'est dans quel contexte ?"
+
+3. DIAGNOSTIC — Il nomme la racine
+   Coach: "On dirait que le vrai sujet c'est pas la timidité — c'est 
+   que tu ne te fais pas confiance sur ta capacité à construire un 
+   argument. Ça te parle ?"
+
+4. PROPOSITION — Il suggère une direction (pas un projet figé)
+   Coach: "Et si on travaillait là-dessus ? Pas devenir un orateur 
+   du jour au lendemain, mais progressivement apprendre à structurer 
+   ta pensée et la porter. Qu'est-ce que tu en penses ?"
+
+5. CO-CONSTRUCTION — Ensemble ils précisent
+   Coach: "Comment tu verrais ça concrètement ? Ça pourrait être 
+   de la lecture, de la pratique, des challenges..."
+
+6. VALIDATION — L'utilisateur confirme → le projet est créé
+   Coach: "OK, je te crée le projet 'Développer mon éloquence'. 
+   On pourra le décomposer en étapes ensemble."
+   → CoachProjectProposal créé (status: "validated")
+   → Quest créé dans l'onglet Projets
+```
+
+### Structure d'un projet transmis à l'onglet Projets
+
+Quand l'utilisateur valide, un Quest est créé avec :
+- **Titre** — nom du projet
+- **Description** — description + contexte
+- **Pourquoi (why)** — lien avec le profil ("Issu de ton introspection : tu as identifié que...")
+- **Type** — remédiation / amplification / alignement / confrontation / vision
+- **Stats impactées** — quelles stats montent en progressant (wisdom, social, etc.)
+- **Catégorie** — mappée automatiquement (HEALTH, CAREER, SOCIAL, MIND, FINANCE)
+- **Status** — ACTIVE
+- **Sous-objectifs** — le coach peut ensuite aider à décomposer en étapes + habitudes liées
 
 ---
 
 ## System Prompt du Coach (pour le LLM)
 
 ```
-Tu es le Coach MyQuest, un expert en développement personnel basé sur :
-- Maps of Meaning (Jordan Peterson) — chaos/ordre, archétype du héros
-- Self-Authoring (Peterson) — écriture réflexive passé/présent/futur
-- Atomic Habits (James Clear) — transformation par les habitudes
-- Logothérapie (Viktor Frankl) — sens et responsabilité
-- Psychologie jungienne — ombre, individuation, archétypes
+Tu es le Coach MyQuest, un expert en développement personnel.
+
+## Tes fondations théoriques
+- Maps of Meaning (Peterson) : chaos/ordre, archétype du héros, confrontation volontaire de l'inconnu
+- Self-Authoring (Peterson) : écriture réflexive passé/présent/futur
+- Atomic Habits (James Clear) : les 4 lois, identité d'abord, règle des 2 minutes
+- Logothérapie (Frankl) : le sens émerge de l'engagement, pas de la recherche du plaisir
+- Psychologie jungienne : ombre, individuation, persona vs authenticité
 
 ## Ton rôle
-Tu guides l'utilisateur dans une introspection structurée. Tu ne donnes PAS de réponses — tu poses des questions qui font réfléchir.
+1. Guider l'utilisateur dans une introspection structurée
+2. Détecter les zones floues de son profil et les approfondir
+3. Quand le profil est assez clair, proposer des PROJETS concrets via un dialogue collaboratif
 
 ## Ce que tu sais de l'utilisateur
-{coach_profile}
+{coach_profile_snapshot}
 
-## Zones floues à explorer
+## Zones floues à explorer (priorité)
 {unclear_zones}
 
-## Historique de la session
+## Historique de la session en cours
 {session_messages}
 
-## Règles
-1. TOUJOURS relire le profil avant de répondre
-2. Cibler les zones floues en priorité — pose des questions qui les clarifient
-3. Une question à la fois, jamais de liste
-4. Reformuler ce que l'utilisateur dit avant de creuser ("Tu dis X... qu'est-ce que ça signifie pour toi ?")
-5. Valider l'émotion avant de challenger
-6. Jamais de jugement
-7. Utiliser le prénom de l'utilisateur
-8. À chaque réponse, évaluer silencieusement :
-   - insightScore (0-10) : profondeur de la réponse
-   - zone : quelle zone du profil est concernée
-   - profileUpdate : faut-il mettre à jour le profil ?
-9. Si l'utilisateur veut arrêter, résumer la session et encourager
+## Règles d'interaction
+1. UNE question à la fois, jamais de liste
+2. Reformuler ce que l'utilisateur dit avant de creuser
+3. Valider l'émotion avant de challenger
+4. Jamais de jugement — challenge bienveillant uniquement
+5. Utiliser le prénom de l'utilisateur
+6. Être fluide et humain — pas de structure rigide visible
+7. Cibler les zones floues en priorité
 
-## Format de réponse (JSON)
+## Règles pour les projets
+- Ne proposer un projet que quand l'insight est mûre (pas trop tôt)
+- Suivre le flow : observation → exploration → diagnostic → proposition → co-construction → validation
+- Toujours expliquer le POURQUOI (lien avec le profil)
+- Classer le projet : remediation | amplification | alignment | confrontation | vision
+- Ne jamais imposer — toujours demander validation
+
+## Format de réponse (JSON strict)
 {
-  "reply": "Ton message texte au format naturel",
-  "insightScore": 7,
-  "zone": "values",
-  "profileUpdate": null | { "field": "values", "value": {...} },
-  "unclearZoneUpdate": null | { "zone": "shadows", "clarity": 0.7 }
+  "reply": "Ton message au format naturel conversationnel",
+  "insightScore": 0-10,        // profondeur de la dernière réponse user (0 si premier message)
+  "zone": "values|strengths|shadows|chaosOrder|vision|null",
+  "profileUpdate": null | {
+    "field": "values|strengths|shadows|chaosOrder|vision|summary",
+    "value": { ... }
+  },
+  "unclearZoneUpdate": null | {
+    "zone": "string",
+    "clarity": 0.0-1.0
+  },
+  "projectProposal": null | {
+    "step": "observation|exploration|diagnostic|proposition|co-construction|validation",
+    "title": "string (si step >= proposition)",
+    "description": "string (si step >= proposition)",
+    "why": "string (si step >= proposition)",
+    "type": "remediation|amplification|alignment|confrontation|vision",
+    "statsImpact": {"wisdom": 0, "health": 0, "energy": 0, "social": 0, "wealth": 0}
+  }
 }
 ```
 
@@ -178,40 +315,117 @@ Tu guides l'utilisateur dans une introspection structurée. Tu ne donnes PAS de 
 
 ### POST /coach/onboarding
 Body: `{ answers: [{question: string, answer: string, zone: string}] }`
-→ Stocke les réponses, génère le profil initial via LLM, retourne le profil + zones floues
+→ Stocke les réponses, génère le profil initial via LLM
+→ Retourne: profil + zones floues + premier message du coach
+
+### GET /coach/dashboard
+→ Retourne: résumé du profil, avancement par zone (clarity %), insights clés, projets proposés, dernière session
 
 ### POST /coach/session/start
-→ Crée une nouvelle session (ou reprend la dernière session paused)
-→ Retourne: sessionId, résumé du profil, premier message du coach
+→ Crée une nouvelle session ou reprend la dernière paused
+→ Charge le profil, crée le snapshot, génère le message de reprise
+→ Retourne: sessionId, message du coach
 
 ### POST /coach/session/:id/message
 Body: `{ message: string }`
-→ Envoie au LLM avec contexte complet, retourne la réponse + met à jour profil/wisdom
+→ Envoie au LLM avec : profileSnapshot + messages session + unclearZones
+→ Stocke la réponse, met à jour wisdom, applique profileUpdate si présent
+→ Retourne: réponse du coach + wisdom gagné + éventuelle proposition de projet
 
-### POST /coach/session/:id/end
-→ Termine la session, calcule wisdom total gagné, met à jour stats
+### POST /coach/session/:id/pause
+→ Passe la session en paused (appelé automatiquement quand l'utilisateur quitte l'onglet)
+→ Met à jour le profil avec les insights de la session
 
 ### GET /coach/profile
-→ Retourne le profil complet + zones floues + wisdom progression
+→ Retourne le profil complet + zones floues + historique wisdom
+
+### POST /coach/project/:id/validate
+→ Valide une proposition de projet → crée un Quest dans l'onglet Projets
+→ Retourne: le Quest créé
+
+### POST /coach/project/:id/reject
+→ Rejette une proposition (le coach en tiendra compte)
 
 ---
 
 ## Frontend
 
 ### Écrans
-1. **CoachOnboardingScreen** — 6 questions, une par écran, input texte libre, bouton suivant
-2. **CoachChatScreen** — Chat classique avec le coach, bouton "Terminer la session" en haut
-3. **CoachProfileScreen** — Visualisation du profil (radar chart des zones claires/floues, portrait)
 
-### UX
-- Bouton "Commencer une session" visible sur le Dashboard
-- Indicateur de sagesse visible (barre de progression ou chiffre)
-- Notification quand le coach a identifié une nouvelle zone à explorer
-- Animation quand wisdom augmente
+1. **CoachOnboardingScreen** — 6 questions, une par écran, input texte libre, progress bar, transition fluide vers le chat
+2. **CoachDashboardScreen** — Vue d'ensemble :
+   - Portrait synthétique (résumé texte)
+   - Radar chart ou barres de clarté par zone (values, strengths, shadows, chaosOrder, vision)
+   - Insights clés (bullet points)
+   - Projets proposés (cards avec bouton valider/rejeter)
+   - Bouton "Continuer la session"
+   - Stat wisdom avec progression
+3. **CoachChatScreen** — Chat fluide avec le coach
+   - Messages user/coach
+   - Indicateur wisdom en temps réel (petite animation quand ça monte)
+   - Auto-save (pas de bouton sauvegarder)
+   - Quitter = pause automatique
+   - Card spéciale quand le coach propose un projet (bouton valider/rejeter inline)
+
+### UX Flow
+```
+[Onglet Coach]
+    ├── Premier lancement → OnboardingScreen → ChatScreen (transition fluide)
+    └── Retours suivants → DashboardScreen
+                              ├── "Continuer" → ChatScreen
+                              └── Consulter profil / projets
+```
+
+### Comportements
+- **Quitter l'onglet** (navigation, fermeture) → `POST /coach/session/:id/pause` automatique
+- **Revenir** → DashboardScreen avec avancement à jour
+- **Proposition de projet** → card spéciale dans le chat avec boutons Valider / Pas maintenant
+- **Projet validé** → toast "Projet créé ! Retrouve-le dans l'onglet Projets" + animation
 
 ---
 
-## LLM Choice
-- **Anthropic Claude 3.5 Sonnet** (bon rapport qualité/prix/vitesse pour du coaching)
-- Clé API à configurer en env var `ANTHROPIC_API_KEY`
-- Fallback: réponses rule-based si pas de clé (mode dégradé)
+## LLM Configuration
+
+- **Provider** : Anthropic (Claude 3.5 Sonnet — bon ratio qualité/prix/vitesse)
+- **Env var** : `ANTHROPIC_API_KEY`
+- **Max tokens par réponse** : 500
+- **Température** : 0.7 (créatif mais cohérent)
+- **Fallback** : Si pas de clé API → mode rule-based dégradé (le système actuel amélioré)
+
+---
+
+## Mapping Stats
+
+| Zone du profil | Stat principale | Stats secondaires |
+|---------------|----------------|-------------------|
+| values | wisdom | - |
+| strengths | energy | wisdom |
+| shadows | wisdom | health |
+| chaosOrder | energy | wisdom |
+| vision | wisdom | wealth |
+| Projet remédiation | Selon le projet | wisdom |
+| Projet amplification | Selon le projet | energy |
+| Projet confrontation | Selon le projet | health, social |
+
+---
+
+## Résumé du Pipeline
+
+```
+ONBOARDING (6 questions)
+    ↓
+PROFIL INITIAL (généré par LLM)
+    ↓
+SESSIONS D'APPROFONDISSEMENT (chat LLM)
+    ↓ détecte zones floues → creuse
+    ↓ wisdom augmente
+    ↓
+PROFIL AFFINÉ (zones deviennent claires)
+    ↓
+PROPOSITIONS DE PROJETS (dialogue collaboratif)
+    ↓ observation → exploration → diagnostic → proposition → co-construction → validation
+    ↓
+PROJETS VALIDÉS → ONGLET PROJETS (Quest)
+    ↓
+DÉCOMPOSITION EN HABITUDES (le coach aide ensuite)
+```
