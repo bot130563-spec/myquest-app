@@ -79,30 +79,29 @@ router.get('/profile', async (req: Request, res: Response) => {
 router.post('/onboarding', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { wheelOfLife, values, vision } = req.body;
+    const { values, vision, strengths, shadows } = req.body;
 
     // Validation basique
-    if (!wheelOfLife && !values && !vision) {
+    if (!values && !vision && !strengths && !shadows) {
       return res.status(400).json({ error: 'At least one field is required' });
     }
 
-    // Créer ou mettre à jour le profil
+    // Créer ou mettre à jour le profil (V2)
     const profile = await prisma.coachProfile.upsert({
       where: { userId },
       create: {
         userId,
         currentPhase: 1,
-        wheelOfLife: wheelOfLife || null,
         values: values || null,
-        vision1y: vision?.oneYear || null,
-        vision5y: vision?.fiveYears || null,
+        vision: vision || null,
+        strengths: strengths || null,
+        shadows: shadows || null,
       },
       update: {
-        wheelOfLife: wheelOfLife || undefined,
         values: values || undefined,
-        vision1y: vision?.oneYear || undefined,
-        vision5y: vision?.fiveYears || undefined,
-        updatedAt: new Date(),
+        vision: vision || undefined,
+        strengths: strengths || undefined,
+        shadows: shadows || undefined,
       },
     });
 
@@ -153,16 +152,17 @@ router.get('/sessions', async (req: Request, res: Response) => {
     const sessions = await prisma.coachSession.findMany({
       where: { userId },
       orderBy: {
-        createdAt: 'desc',
+        startedAt: 'desc',
       },
       take: limit,
       select: {
         id: true,
         phase: true,
-        summary: true,
-        insights: true,
-        actions: true,
-        createdAt: true,
+        status: true,
+        topic: true,
+        wisdomGained: true,
+        startedAt: true,
+        endedAt: true,
         updatedAt: true,
       },
     });

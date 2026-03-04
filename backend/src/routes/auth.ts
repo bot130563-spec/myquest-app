@@ -99,11 +99,13 @@ router.post('/register', async (req: Request, res: Response) => {
         // Crée les stats liées automatiquement
         stats: {
           create: {
-            health: 50,
-            energy: 50,
+            body: 50,
+            mind: 50,
             wisdom: 50,
             social: 50,
-            wealth: 50,
+            love: 50,
+            career: 50,
+            finance: 50,
             currentStreak: 0,
             longestStreak: 0,
           },

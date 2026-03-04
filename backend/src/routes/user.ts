@@ -183,21 +183,23 @@ router.get('/stats', async (req: Request, res: Response) => {
       return;
     }
     
-    // Calcule la moyenne des stats (indicateur global)
-    const coreStats = [stats.health, stats.energy, stats.wisdom, stats.social, stats.wealth];
+    // Calcule la moyenne des stats (indicateur global — 7 dimensions)
+    const coreStats = [stats.body, stats.mind, stats.wisdom, stats.social, stats.love, stats.career, stats.finance];
     const averageScore = Math.round(coreStats.reduce((a, b) => a + b, 0) / coreStats.length);
-    
+
     res.json({
       ...stats,
       // Score global calculé
       averageScore,
-      // Labels pour le frontend
+      // Labels pour le frontend (7 dimensions)
       labels: {
-        health: '💪 Santé',
-        energy: '⚡ Énergie',
+        body: '💪 Corps',
+        mind: '🧠 Esprit',
         wisdom: '📚 Sagesse',
         social: '👥 Social',
-        wealth: '💰 Finances',
+        love: '❤️ Amour',
+        career: '🎯 Carrière',
+        finance: '💰 Finances',
       },
     });
     

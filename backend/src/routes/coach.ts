@@ -1,588 +1,881 @@
 /**
  * ==========================================
- * 🤖 ROUTES COACH IA
+ * 🤖 ROUTES COACH V2 — 7 dimensions, LLM, projets
  * ==========================================
- * 
- * Génère des conseils personnalisés basés sur:
- * - Les stats du joueur
- * - Les quêtes en cours
- * - Les habitudes et leur streak
- * - Les entrées journal récentes
+ *
+ * Endpoints :
+ * - POST /coach/onboarding      — Questionnaire 6 questions → profil initial via LLM
+ * - GET  /coach/dashboard       — Vue d'ensemble profil + zones + projets
+ * - POST /coach/session/start   — Créer ou reprendre une session
+ * - POST /coach/session/:id/message — Envoyer un message au coach
+ * - POST /coach/session/:id/pause  — Mettre en pause la session
+ * - GET  /coach/profile         — Profil complet
+ * - POST /coach/project/:id/validate — Valider une proposition → créer Quest
+ * - POST /coach/project/:id/reject  — Rejeter une proposition
  */
 
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authMiddleware } from '../middleware/auth';
+import Anthropic from '@anthropic-ai/sdk';
 
 const router = Router();
 const prisma = new PrismaClient();
 
-// Types pour l'analyse
-interface UserContext {
-  stats: {
-    health: number;
-    energy: number;
-    wisdom: number;
-    social: number;
-    wealth: number;
-    currentStreak: number;
-  };
-  activeQuests: number;
-  completedQuests: number;
-  habits: {
-    total: number;
-    completedToday: number;
-    bestStreak: number;
-  };
-  recentMood: number | null;
-  level: number;
+// Client Anthropic (initialisé si la clé est présente)
+const anthropic = process.env.ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  : null;
+
+const COACH_MODEL = 'claude-sonnet-4-20250514';
+const MAX_TOKENS = 1024;
+const TEMPERATURE = 0.7;
+
+// ============================================
+// 📦 TYPES
+// ============================================
+
+interface OnboardingAnswer {
+  question: string;
+  answer: string;
+  zone: string; // values | strengths | shadows | chaosOrder | vision
+}
+
+// Réponse structurée du LLM
+interface CoachLLMResponse {
+  reply: string;
+  insightScore: number;
+  zone: string | null;
+  profileUpdate: {
+    field: string;
+    value: any;
+  } | null;
+  unclearZoneUpdate: {
+    zone: string;
+    clarity: number;
+  } | null;
+  projectProposal: {
+    step: string;
+    title?: string;
+    description?: string;
+    why?: string;
+    type?: string;
+    statsImpact?: Record<string, number>;
+  } | null;
 }
 
 // ============================================
-// 🎯 GET /coach/advice - Obtenir des conseils
+// 🧠 SYSTEM PROMPT DU COACH
 // ============================================
-router.get('/advice', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const userId = req.userId!;
-    
-    // Récupérer toutes les données de l'utilisateur
-    const [user, stats, quests, habits, journalEntries] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: userId },
-        include: { avatar: true }
-      }),
-      prisma.stats.findUnique({ where: { userId } }),
-      prisma.quest.findMany({ where: { userId } }),
-      prisma.habit.findMany({ 
-        where: { userId },
-        include: { logs: { take: 7, orderBy: { completedAt: 'desc' } } }
-      }),
-      prisma.journalEntry.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        take: 5
-      })
-    ]);
 
-    if (!stats) {
-      return res.status(404).json({ error: 'Stats not found' });
-    }
+function buildCoachSystemPrompt(
+  profileSnapshot: any,
+  unclearZones: any,
+  sessionMessages: string
+): string {
+  return `Tu es le Coach MyQuest, un expert en développement personnel.
 
-    // Construire le contexte utilisateur
-    const today = new Date().toISOString().split('T')[0];
-    const activeQuests = quests.filter(q => q.status === 'ACTIVE').length;
-    const completedQuests = quests.filter(q => q.status === 'COMPLETED').length;
-    
-    const habitsCompletedToday = habits.filter(h => 
-      h.logs.some(log => log.completedDate.toISOString().split('T')[0] === today)
-    ).length;
-    
-    const bestHabitStreak = Math.max(...habits.map(h => h.currentStreak), 0);
-    
-    const recentMoods = journalEntries
-      .filter(j => j.mood !== null)
-      .map(j => j.mood as number);
-    const avgMood = recentMoods.length > 0 
-      ? recentMoods.reduce((a, b) => a + b, 0) / recentMoods.length 
-      : null;
+## Tes fondations théoriques
+- Maps of Meaning (Peterson) : chaos/ordre, archétype du héros, confrontation volontaire de l'inconnu
+- Self-Authoring (Peterson) : écriture réflexive passé/présent/futur
+- Atomic Habits (James Clear) : les 4 lois, identité d'abord, règle des 2 minutes
+- Logothérapie (Frankl) : le sens émerge de l'engagement, pas de la recherche du plaisir
+- Psychologie jungienne : ombre, individuation, persona vs authenticité
 
-    const context: UserContext = {
-      stats: {
-        health: stats.health,
-        energy: stats.energy,
-        wisdom: stats.wisdom,
-        social: stats.social,
-        wealth: stats.wealth,
-        currentStreak: stats.currentStreak
-      },
-      activeQuests,
-      completedQuests,
-      habits: {
-        total: habits.length,
-        completedToday: habitsCompletedToday,
-        bestStreak: bestHabitStreak
-      },
-      recentMood: avgMood,
-      level: user?.avatar?.level || 1
-    };
+## Ton rôle
+1. Guider l'utilisateur dans une introspection structurée
+2. Détecter les zones floues de son profil et les approfondir
+3. Quand le profil est assez clair, proposer des PROJETS concrets via un dialogue collaboratif
 
-    // Générer les conseils
-    const advice = generateAdvice(context);
+## Ce que tu sais de l'utilisateur
+${profileSnapshot ? JSON.stringify(profileSnapshot, null, 2) : 'Profil non encore créé.'}
 
-    res.json({
-      advice,
-      context: {
-        level: context.level,
-        stats: context.stats,
-        questsActive: activeQuests,
-        questsCompleted: completedQuests,
-        habitsToday: `${habitsCompletedToday}/${habits.length}`,
-        mood: avgMood ? Math.round(avgMood * 10) / 10 : null
-      }
-    });
+## Zones floues à explorer (priorité)
+${unclearZones ? JSON.stringify(unclearZones, null, 2) : 'Aucune zone floue identifiée.'}
 
-  } catch (error) {
-    console.error('Coach advice error:', error);
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: 'Erreur lors de la génération des conseils'
-    });
-  }
-});
+## Historique de la session en cours
+${sessionMessages || 'Début de session.'}
 
-// ============================================
-// 🧠 GÉNÉRATEUR DE CONSEILS
-// ============================================
-function generateAdvice(ctx: UserContext): {
-  greeting: string;
-  tips: Array<{ icon: string; category: string; message: string; priority: 'high' | 'medium' | 'low' }>;
-  motivation: string;
-  focus: string;
-} {
-  const tips: Array<{ icon: string; category: string; message: string; priority: 'high' | 'medium' | 'low' }> = [];
-  
-  // Analyse des stats faibles (< 30)
-  const weakStats: string[] = [];
-  if (ctx.stats.health < 30) weakStats.push('santé');
-  if (ctx.stats.energy < 30) weakStats.push('énergie');
-  if (ctx.stats.wisdom < 30) weakStats.push('sagesse');
-  if (ctx.stats.social < 30) weakStats.push('social');
-  if (ctx.stats.wealth < 30) weakStats.push('finances');
+## Les 7 dimensions de vie
+Corps (💪), Esprit (🧠), Sagesse (📚), Social (👥), Amour (❤️), Carrière (🎯), Finances (💰)
+Tu dois construire une vision GLOBALE de l'utilisateur sur ces 7 dimensions pour proposer des projets pertinents, réalistes, adaptés et évolutifs.
 
-  // Conseil sur les stats faibles
-  if (weakStats.length > 0) {
-    const statTips: Record<string, { icon: string; message: string }> = {
-      'santé': { icon: '❤️', message: 'Ta santé est basse. Essaie une quête sport ou méditation aujourd\'hui!' },
-      'énergie': { icon: '⚡', message: 'Ton énergie diminue. Prends une pause, fais une sieste ou va marcher.' },
-      'sagesse': { icon: '📚', message: 'Booste ta sagesse! Lis 10 pages d\'un livre ou regarde une vidéo éducative.' },
-      'social': { icon: '👥', message: 'Ton social est bas. Appelle un ami ou rejoins une activité de groupe!' },
-      'finances': { icon: '💰', message: 'Tes finances ont besoin d\'attention. Revois ton budget ou cherche une opportunité.' }
-    };
-    
-    weakStats.forEach(stat => {
-      tips.push({
-        icon: statTips[stat].icon,
-        category: stat.charAt(0).toUpperCase() + stat.slice(1),
-        message: statTips[stat].message,
-        priority: 'high'
-      });
-    });
-  }
+## Règles d'interaction
+1. UNE question à la fois, jamais de liste
+2. Reformuler ce que l'utilisateur dit avant de creuser
+3. Valider l'émotion avant de challenger
+4. Jamais de jugement — challenge bienveillant uniquement
+5. Utiliser le prénom de l'utilisateur
+6. Être fluide et humain — pas de structure rigide visible
+7. Cibler les zones floues en priorité
+8. Amour (❤️) : n'aborder que si l'utilisateur en parle de lui-même
 
-  // Conseil sur les habitudes
-  if (ctx.habits.total > 0 && ctx.habits.completedToday < ctx.habits.total) {
-    const remaining = ctx.habits.total - ctx.habits.completedToday;
-    tips.push({
-      icon: '🔄',
-      category: 'Habitudes',
-      message: `Il te reste ${remaining} habitude${remaining > 1 ? 's' : ''} à compléter aujourd'hui. Tu peux le faire!`,
-      priority: ctx.habits.completedToday === 0 ? 'high' : 'medium'
-    });
-  } else if (ctx.habits.total > 0 && ctx.habits.completedToday === ctx.habits.total) {
-    tips.push({
-      icon: '🌟',
-      category: 'Habitudes',
-      message: 'Bravo! Tu as complété toutes tes habitudes aujourd\'hui! Continue comme ça!',
-      priority: 'low'
-    });
-  }
+## Limites (STRICTES)
+- Tu es un coach de développement personnel, PAS un thérapeute
+- JAMAIS de diagnostic (dépression, anxiété, trauma, trouble)
+- Si détresse importante : valider l'émotion → rappeler que tu n'es pas un professionnel de santé → suggérer de consulter un psy/thérapeute → proposer de continuer sur un autre sujet
+- JAMAIS de prescription (médicaments, régimes, traitements)
+- Ne JAMAIS pousser l'utilisateur au-delà de ce qu'il est prêt à explorer
 
-  // Conseil sur les quêtes
-  if (ctx.activeQuests === 0 && ctx.completedQuests < 3) {
-    tips.push({
-      icon: '⚔️',
-      category: 'Quêtes',
-      message: 'Tu n\'as pas de quête active. Crée-en une pour progresser dans ton aventure!',
-      priority: 'medium'
-    });
-  } else if (ctx.activeQuests > 5) {
-    tips.push({
-      icon: '🎯',
-      category: 'Focus',
-      message: 'Tu as beaucoup de quêtes actives. Concentre-toi sur 2-3 prioritaires pour avancer plus vite.',
-      priority: 'medium'
-    });
-  }
+## Règles pour les projets
+- Ne proposer un projet que quand l'insight est mûre (pas trop tôt)
+- Suivre le flow : observation → exploration → diagnostic → proposition → co-construction → validation
+- Toujours expliquer le POURQUOI (lien avec le profil)
+- Classer le projet : remediation | amplification | alignment | confrontation | vision
+- Ne jamais imposer — toujours demander validation
 
-  // Conseil sur l'humeur
-  if (ctx.recentMood !== null && ctx.recentMood < 3) {
-    tips.push({
-      icon: '💙',
-      category: 'Bien-être',
-      message: 'Ton humeur récente semble basse. Prends soin de toi - une petite victoire peut tout changer!',
-      priority: 'high'
-    });
-  }
+## Format de réponse (JSON strict)
+Tu dois TOUJOURS répondre avec un JSON valide, sans texte autour. Pas de markdown, pas de backticks, juste le JSON :
+{
+  "reply": "Ton message au format naturel conversationnel",
+  "insightScore": 0,
+  "zone": null,
+  "profileUpdate": null,
+  "unclearZoneUpdate": null,
+  "projectProposal": null
+}
 
-  // Conseil sur le streak
-  if (ctx.stats.currentStreak >= 7) {
-    tips.push({
-      icon: '🔥',
-      category: 'Streak',
-      message: `Incroyable! ${ctx.stats.currentStreak} jours de streak! Tu es sur une lancée fantastique!`,
-      priority: 'low'
-    });
-  } else if (ctx.stats.currentStreak === 0) {
-    tips.push({
-      icon: '🌱',
-      category: 'Nouveau départ',
-      message: 'Chaque jour est une nouvelle chance. Commence petit, mais commence maintenant!',
-      priority: 'medium'
-    });
-  }
-
-  // Générer le greeting basé sur l'heure
-  const hour = new Date().getHours();
-  let greeting: string;
-  if (hour < 12) {
-    greeting = 'Bonjour, héros! ☀️';
-  } else if (hour < 18) {
-    greeting = 'Bon après-midi, aventurier! 🌤️';
-  } else {
-    greeting = 'Bonsoir, champion! 🌙';
-  }
-
-  // Message de motivation basé sur le niveau
-  const motivations = [
-    'Chaque petit pas compte. Tu construis ta légende!',
-    'Les héros ne naissent pas, ils se forgent jour après jour.',
-    'Ta seule limite est celle que tu te fixes.',
-    'Le succès est la somme de petits efforts répétés.',
-    'Aujourd\'hui est le premier jour du reste de ton aventure!'
-  ];
-  const motivation = motivations[Math.floor(Math.random() * motivations.length)];
-
-  // Déterminer le focus principal
-  let focus: string;
-  if (tips.some(t => t.priority === 'high' && t.category !== 'Streak')) {
-    const highPriority = tips.find(t => t.priority === 'high');
-    focus = `Priorité: ${highPriority?.category}`;
-  } else if (ctx.habits.completedToday < ctx.habits.total) {
-    focus = 'Complète tes habitudes du jour';
-  } else if (ctx.activeQuests > 0) {
-    focus = 'Avance sur tes quêtes actives';
-  } else {
-    focus = 'Explore et crée de nouveaux objectifs';
-  }
-
-  // Trier les tips par priorité
-  const priorityOrder = { high: 0, medium: 1, low: 2 };
-  tips.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
-
-  return {
-    greeting,
-    tips: tips.slice(0, 5), // Max 5 conseils
-    motivation,
-    focus
-  };
+Champs optionnels quand pertinent :
+- insightScore: 0-10 (profondeur de la dernière réponse user, 0 si premier message)
+- zone: "values"|"strengths"|"shadows"|"chaosOrder"|"vision"|null
+- profileUpdate: {"field": "values|strengths|shadows|chaosOrder|vision|summary", "value": {...}}
+- unclearZoneUpdate: {"zone": "string", "clarity": 0.0-1.0}
+- projectProposal: {"step": "observation|exploration|diagnostic|proposition|co-construction|validation", "title": "...", "description": "...", "why": "...", "type": "remediation|amplification|alignment|confrontation|vision", "statsImpact": {"wisdom": 0, "body": 0, ...}}`;
 }
 
 // ============================================
-// 💬 POST /coach/message - Chat avec le coach
+// 🔧 FONCTIONS HELPER
 // ============================================
-router.post('/message', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const userId = req.userId!;
-    const { message, sessionId } = req.body;
 
-    if (!message || typeof message !== 'string') {
-      return res.status(400).json({ error: 'Message is required' });
-    }
-
-    // Récupérer le contexte utilisateur complet
-    const [user, stats, quests, habits, journalEntries] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: userId },
-        include: { avatar: true }
-      }),
-      prisma.stats.findUnique({ where: { userId } }),
-      prisma.quest.findMany({ where: { userId } }),
-      prisma.habit.findMany({
-        where: { userId },
-        include: { logs: { take: 7, orderBy: { completedAt: 'desc' } } }
-      }),
-      prisma.journalEntry.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        take: 7
-      })
-    ]);
-
-    if (!stats || !user) {
-      return res.status(404).json({ error: 'User data not found' });
-    }
-
-    // Construire le contexte
-    const today = new Date().toISOString().split('T')[0];
-    const habitsCompletedToday = habits.filter(h =>
-      h.logs.some(log => log.completedDate.toISOString().split('T')[0] === today)
-    ).length;
-
-    const context = {
-      userName: user.name,
-      level: user.avatar?.level || 1,
-      stats: {
-        health: stats.health,
-        energy: stats.energy,
-        wisdom: stats.wisdom,
-        social: stats.social,
-        wealth: stats.wealth,
-        currentStreak: stats.currentStreak
-      },
-      habits: habits.map(h => ({
-        title: h.title,
-        category: h.category,
-        currentStreak: h.currentStreak,
-        completedToday: h.logs.some(log => log.completedDate.toISOString().split('T')[0] === today)
-      })),
-      quests: quests.filter(q => q.status === 'ACTIVE').map(q => ({
-        title: q.title,
-        category: q.category
-      })),
-      journalEntries: journalEntries.map(j => ({
-        content: j.content,
-        mood: j.mood,
-        date: j.createdAt
-      }))
+/**
+ * Appelle le LLM et parse la réponse JSON
+ */
+async function callCoachLLM(
+  systemPrompt: string,
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>
+): Promise<CoachLLMResponse> {
+  if (!anthropic) {
+    // Mode fallback sans clé API
+    return {
+      reply: "Le coach IA n'est pas encore configuré. Configurez ANTHROPIC_API_KEY pour activer le coaching intelligent.",
+      insightScore: 0,
+      zone: null,
+      profileUpdate: null,
+      unclearZoneUpdate: null,
+      projectProposal: null,
     };
-
-    // Si l'API Anthropic est disponible, l'utiliser
-    const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    let reply: string;
-    let phase: string = 'phase1';
-
-    if (anthropicKey) {
-      // TODO: Implémenter l'appel à l'API Anthropic
-      // Pour l'instant, mode mock intelligent
-      reply = generateIntelligentMockReply(message, context);
-    } else {
-      reply = generateIntelligentMockReply(message, context);
-    }
-
-    // Déterminer la phase selon le contenu de la conversation
-    if (message.toLowerCase().includes('vision') || message.toLowerCase().includes('objectif')) {
-      phase = 'phase2';
-    } else if (message.toLowerCase().includes('habitude') || message.toLowerCase().includes('routine')) {
-      phase = 'phase3';
-    } else if (message.toLowerCase().includes('plan') || message.toLowerCase().includes('action')) {
-      phase = 'phase4';
-    }
-
-    res.json({
-      reply,
-      sessionId: sessionId || `session-${Date.now()}`,
-      phase,
-      suggestedActions: getSuggestedActions(context)
-    });
-
-  } catch (error) {
-    console.error('Coach message error:', error);
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: 'Erreur lors de la communication avec le coach'
-    });
   }
-});
+
+  const response = await anthropic.messages.create({
+    model: COACH_MODEL,
+    max_tokens: MAX_TOKENS,
+    temperature: TEMPERATURE,
+    system: systemPrompt,
+    messages: messages,
+  });
+
+  // Extraire le texte de la réponse
+  const textBlock = response.content.find(b => b.type === 'text');
+  const rawText = textBlock ? textBlock.text : '';
+
+  // Parser le JSON — le LLM peut inclure des backticks
+  const jsonStr = rawText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+
+  try {
+    return JSON.parse(jsonStr) as CoachLLMResponse;
+  } catch {
+    // Si le parsing échoue, retourner la réponse brute
+    return {
+      reply: rawText,
+      insightScore: 0,
+      zone: null,
+      profileUpdate: null,
+      unclearZoneUpdate: null,
+      projectProposal: null,
+    };
+  }
+}
+
+/**
+ * Met à jour la stat wisdom de l'utilisateur
+ */
+async function updateWisdom(userId: string, wisdomPoints: number): Promise<void> {
+  if (wisdomPoints <= 0) return;
+
+  await prisma.stats.update({
+    where: { userId },
+    data: {
+      wisdom: { increment: Math.min(wisdomPoints, 100) },
+    },
+  });
+}
+
+/**
+ * Applique une mise à jour du profil signalée par le LLM
+ */
+async function applyProfileUpdate(
+  userId: string,
+  update: CoachLLMResponse['profileUpdate']
+): Promise<void> {
+  if (!update) return;
+
+  const { field, value } = update;
+  const validFields = ['values', 'strengths', 'shadows', 'chaosOrder', 'vision', 'summary'];
+  if (!validFields.includes(field)) return;
+
+  await prisma.coachProfile.update({
+    where: { userId },
+    data: { [field]: field === 'summary' ? String(value) : value },
+  });
+}
+
+/**
+ * Met à jour les zones floues du profil
+ */
+async function applyUnclearZoneUpdate(
+  userId: string,
+  update: CoachLLMResponse['unclearZoneUpdate']
+): Promise<void> {
+  if (!update) return;
+
+  const profile = await prisma.coachProfile.findUnique({
+    where: { userId },
+    select: { unclearZones: true },
+  });
+
+  const zones: Array<{ zone: string; clarity: number; reason?: string }> =
+    Array.isArray(profile?.unclearZones) ? (profile.unclearZones as any[]) : [];
+
+  // Trouver et mettre à jour la zone ou l'ajouter
+  const existingIndex = zones.findIndex(z => z.zone === update.zone);
+  const oldClarity = existingIndex >= 0 ? zones[existingIndex].clarity : 0;
+
+  if (existingIndex >= 0) {
+    zones[existingIndex].clarity = update.clarity;
+  } else {
+    zones.push({ zone: update.zone, clarity: update.clarity });
+  }
+
+  await prisma.coachProfile.update({
+    where: { userId },
+    data: { unclearZones: zones },
+  });
+
+  // Bonus wisdom : quand une zone passe de floue (<0.5) à claire (>0.7)
+  if (oldClarity < 0.5 && update.clarity > 0.7) {
+    await updateWisdom(userId, 10);
+  }
+}
+
+/**
+ * Formate les messages d'une session pour le contexte LLM
+ */
+function formatSessionMessages(
+  messages: Array<{ role: string; content: string }>
+): string {
+  return messages
+    .map(m => `[${m.role}]: ${m.content}`)
+    .join('\n\n');
+}
 
 // ============================================
-// 📋 GET /coach/phases - Les 4 phases du coaching
+// 📝 POST /coach/onboarding
 // ============================================
-router.get('/phases', authMiddleware, async (req: Request, res: Response) => {
+// Reçoit les 6 réponses d'onboarding, appelle le LLM pour générer le profil initial
+
+router.post('/onboarding', authMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.userId!;
+    const { answers } = req.body as { answers: OnboardingAnswer[] };
 
-    // Récupérer les stats pour déterminer la progression
-    const [stats, habits, journal] = await Promise.all([
-      prisma.stats.findUnique({ where: { userId } }),
-      prisma.habit.count({ where: { userId } }),
-      prisma.journalEntry.count({ where: { userId } })
-    ]);
+    if (!answers || !Array.isArray(answers) || answers.length === 0) {
+      return res.status(400).json({ error: 'Les réponses sont requises' });
+    }
 
-    const phases = [
-      {
-        id: 'phase1',
-        title: 'Connaissance de soi',
-        icon: 'brain',
-        description: 'Explore tes valeurs, forces et émotions',
-        status: journal > 0 ? 'completed' : 'in_progress',
-        progress: journal > 0 ? 100 : 50
-      },
-      {
-        id: 'phase2',
-        title: 'Vision & Ambitions',
-        icon: 'target',
-        description: 'Définis ta vision à court, moyen et long terme',
-        status: journal > 3 ? 'in_progress' : 'locked',
-        progress: journal > 3 ? 30 : 0
-      },
-      {
-        id: 'phase3',
-        title: 'Habitudes',
-        icon: 'repeat',
-        description: 'Analyse et optimise tes habitudes avec Atomic Habits',
-        status: habits > 0 ? 'in_progress' : 'locked',
-        progress: habits > 0 ? 60 : 0
-      },
-      {
-        id: 'phase4',
-        title: 'Plan d\'action',
-        icon: 'flash',
-        description: 'Crée des systèmes pour atteindre tes objectifs',
-        status: (habits > 2 && journal > 5) ? 'in_progress' : 'locked',
-        progress: (habits > 2 && journal > 5) ? 20 : 0
-      }
-    ];
-
-    res.json({ phases });
-
-  } catch (error) {
-    console.error('Coach phases error:', error);
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: 'Erreur lors du chargement des phases'
-    });
-  }
-});
-
-// ============================================
-// 🔍 POST /coach/habit-analysis - Analyse Atomic Habits
-// ============================================
-router.post('/habit-analysis', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const userId = req.userId!;
-
-    const habits = await prisma.habit.findMany({
+    // Vérifier si l'onboarding est déjà fait
+    const existingProfile = await prisma.coachProfile.findUnique({
       where: { userId },
-      include: { logs: { take: 30, orderBy: { completedAt: 'desc' } } }
+    });
+    if (existingProfile?.onboardingDone) {
+      return res.status(400).json({ error: 'Onboarding déjà complété' });
+    }
+
+    // Créer une session d'onboarding
+    const session = await prisma.coachSession.create({
+      data: {
+        userId,
+        status: 'active',
+        phase: 1,
+        topic: 'onboarding',
+      },
     });
 
-    const analysis = habits.map(habit => {
-      const completionRate = habit.logs.length / 30;
-      const streak = habit.currentStreak;
+    // Stocker les réponses en tant que CoachMessages
+    for (const answer of answers) {
+      // Question (system)
+      await prisma.coachMessage.create({
+        data: {
+          sessionId: session.id,
+          role: 'system',
+          content: answer.question,
+          zone: answer.zone,
+        },
+      });
+      // Réponse (user)
+      await prisma.coachMessage.create({
+        data: {
+          sessionId: session.id,
+          role: 'user',
+          content: answer.answer,
+          zone: answer.zone,
+        },
+      });
+    }
 
-      let score = 0;
-      let recommendation = '';
-      let atomicLaw = '';
+    // Appeler le LLM pour générer le profil initial
+    const onboardingPrompt = `L'utilisateur vient de compléter son questionnaire d'onboarding. Voici ses réponses :
 
-      if (streak > 7 && completionRate > 0.7) {
-        score = 90;
-        recommendation = 'Excellente habitude! Continue ainsi.';
-        atomicLaw = 'Loi 4: Tu rends cette habitude satisfaisante';
-      } else if (streak > 3 && completionRate > 0.5) {
-        score = 70;
-        recommendation = 'Bonne progression. Rends-la encore plus facile.';
-        atomicLaw = 'Loi 3: Réduis encore la friction';
-      } else if (completionRate < 0.3) {
-        score = 40;
-        recommendation = 'Habitude difficile. Applique la règle des 2 minutes.';
-        atomicLaw = 'Loi 3: Rendre facile - commence par 2 min';
-      } else {
-        score = 55;
-        recommendation = 'Crée un signal clair pour déclencher cette habitude.';
-        atomicLaw = 'Loi 1: Rendre évident';
-      }
+${answers.map((a, i) => `Q${i + 1} [${a.zone}]: ${a.question}\nR: ${a.answer}`).join('\n\n')}
 
+Analyse ces réponses et génère :
+1. Un profil initial (values, strengths, shadows, chaosOrder, vision, summary)
+2. Les zones floues (unclearZones) — ce qui est vague ou mérite d'être approfondi
+3. Un premier message d'approfondissement naturel, basé sur la zone la plus floue
+
+Réponds en JSON strict avec le format habituel. Le profileUpdate doit contenir les données initiales. Inclus aussi les unclearZones.
+
+IMPORTANT : dans ta reply, enchaîne naturellement comme si tu venais de lire leurs réponses. Pas de "Bonjour", pas de formalisme. Sois chaleureux et direct.`;
+
+    const llmResponse = await callCoachLLM(
+      buildCoachSystemPrompt(null, null, ''),
+      [{ role: 'user', content: onboardingPrompt }]
+    );
+
+    // Créer ou mettre à jour le profil
+    const profileData: any = {
+      onboardingDone: true,
+      currentPhase: 1,
+    };
+
+    // Appliquer le profileUpdate du LLM s'il existe
+    if (llmResponse.profileUpdate) {
+      profileData[llmResponse.profileUpdate.field] = llmResponse.profileUpdate.value;
+    }
+
+    // Appliquer les unclearZones
+    if (llmResponse.unclearZoneUpdate) {
+      profileData.unclearZones = [llmResponse.unclearZoneUpdate];
+    }
+
+    const profile = await prisma.coachProfile.upsert({
+      where: { userId },
+      create: { userId, ...profileData },
+      update: profileData,
+    });
+
+    // Stocker le message du coach
+    await prisma.coachMessage.create({
+      data: {
+        sessionId: session.id,
+        role: 'coach',
+        content: llmResponse.reply,
+      },
+    });
+
+    // Mettre à jour la session avec le snapshot du profil
+    await prisma.coachSession.update({
+      where: { id: session.id },
+      data: { profileSnapshot: profile as any },
+    });
+
+    // Donner de la wisdom pour l'onboarding (+5)
+    await updateWisdom(userId, 5);
+
+    res.json({
+      profile,
+      sessionId: session.id,
+      coachMessage: llmResponse.reply,
+      unclearZones: profile.unclearZones,
+    });
+  } catch (error) {
+    console.error('Erreur onboarding:', error);
+    res.status(500).json({ error: 'Erreur lors de l\'onboarding' });
+  }
+});
+
+// ============================================
+// 📊 GET /coach/dashboard
+// ============================================
+// Retourne profil, avancement par zone, insights, projets proposés
+
+router.get('/dashboard', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId!;
+
+    const [profile, projects, lastSession, stats] = await Promise.all([
+      prisma.coachProfile.findUnique({ where: { userId } }),
+      prisma.coachProjectProposal.findMany({
+        where: { userId, status: { in: ['proposed', 'discussing'] } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.coachSession.findFirst({
+        where: { userId },
+        orderBy: { startedAt: 'desc' },
+        include: { messages: { orderBy: { createdAt: 'desc' }, take: 1 } },
+      }),
+      prisma.stats.findUnique({ where: { userId }, select: { wisdom: true } }),
+    ]);
+
+    if (!profile) {
+      return res.json({
+        onboardingDone: false,
+        message: 'Commence ton onboarding pour activer le coach.',
+      });
+    }
+
+    // Calculer la clarté par zone
+    const zones = ['values', 'strengths', 'shadows', 'chaosOrder', 'vision'];
+    const unclearZones: Array<{ zone: string; clarity: number }> =
+      Array.isArray(profile.unclearZones) ? (profile.unclearZones as any[]) : [];
+
+    const zoneProgress = zones.map(zone => {
+      const unclearEntry = unclearZones.find(z => z.zone === zone);
+      // Si la zone est dans unclearZones, utiliser sa clarity, sinon vérifier si le champ est rempli
+      const hasData = (profile as any)[zone] !== null && (profile as any)[zone] !== undefined;
+      const clarity = unclearEntry ? unclearEntry.clarity : (hasData ? 0.8 : 0.0);
       return {
-        habitId: habit.id,
-        title: habit.title,
-        score,
-        streak,
-        completionRate: Math.round(completionRate * 100),
-        status: score > 70 ? 'strong' : score > 50 ? 'developing' : 'needs_work',
-        recommendation,
-        atomicLaw
+        zone,
+        clarity: Math.round(clarity * 100),
+        hasData,
       };
     });
 
     res.json({
-      analysis,
-      overallScore: analysis.length > 0
-        ? Math.round(analysis.reduce((sum, h) => sum + h.score, 0) / analysis.length)
-        : 0,
-      totalHabits: habits.length
+      onboardingDone: profile.onboardingDone,
+      profile: {
+        summary: profile.summary,
+        values: profile.values,
+        strengths: profile.strengths,
+        shadows: profile.shadows,
+        chaosOrder: profile.chaosOrder,
+        vision: profile.vision,
+        currentPhase: profile.currentPhase,
+      },
+      zoneProgress,
+      wisdom: stats?.wisdom || 50,
+      projects,
+      lastSession: lastSession
+        ? {
+            id: lastSession.id,
+            status: lastSession.status,
+            topic: lastSession.topic,
+            wisdomGained: lastSession.wisdomGained,
+            lastMessage: lastSession.messages[0]?.content || null,
+            startedAt: lastSession.startedAt,
+          }
+        : null,
     });
-
   } catch (error) {
-    console.error('Habit analysis error:', error);
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: 'Erreur lors de l\'analyse des habitudes'
-    });
+    console.error('Erreur dashboard:', error);
+    res.status(500).json({ error: 'Erreur lors du chargement du dashboard' });
   }
 });
 
 // ============================================
-// 🧠 FONCTIONS HELPER
+// 🚀 POST /coach/session/start
 // ============================================
+// Crée une nouvelle session ou reprend la dernière en pause
 
-function generateIntelligentMockReply(message: string, context: any): string {
-  const lowerMsg = message.toLowerCase();
-  const userName = context.userName || 'héros';
+router.post('/session/start', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId!;
 
-  // Check-in émotionnel
-  if (lowerMsg.includes('bonjour') || lowerMsg.includes('salut') || lowerMsg.includes('hello')) {
-    return `Bonjour ${userName}! 👋 Comment tu arrives dans cette session aujourd'hui? Sur une échelle de 1 à 10, comment tu te sens?`;
-  }
+    // Vérifier que l'onboarding est fait
+    const profile = await prisma.coachProfile.findUnique({ where: { userId } });
+    if (!profile?.onboardingDone) {
+      return res.status(400).json({ error: 'Onboarding requis avant de démarrer une session' });
+    }
 
-  // Réponse à un chiffre (humeur)
-  if (/^\d+$/.test(message.trim())) {
-    const mood = parseInt(message.trim());
-    if (mood >= 7) {
-      return `Super! ${mood}/10, c'est génial! 🌟 Qu'est-ce qui contribue à cette belle énergie aujourd'hui?`;
-    } else if (mood >= 4) {
-      return `Je vois, ${mood}/10. C'est une humeur neutre. Qu'est-ce qui pourrait faire passer ça à un 7 ou 8?`;
+    // Chercher une session active ou en pause
+    let session = await prisma.coachSession.findFirst({
+      where: { userId, status: { in: ['active', 'paused'] } },
+      orderBy: { startedAt: 'desc' },
+      include: { messages: { orderBy: { createdAt: 'asc' } } },
+    });
+
+    if (session) {
+      // Reprendre la session
+      if (session.status === 'paused') {
+        await prisma.coachSession.update({
+          where: { id: session.id },
+          data: { status: 'active' },
+        });
+      }
     } else {
-      return `${mood}/10... Je sens que c'est difficile en ce moment. Veux-tu m'en parler? Qu'est-ce qui pèse sur toi?`;
+      // Créer une nouvelle session
+      session = await prisma.coachSession.create({
+        data: {
+          userId,
+          status: 'active',
+          phase: profile.currentPhase,
+          profileSnapshot: profile as any,
+        },
+        include: { messages: true },
+      });
     }
-  }
 
-  // Analyse des habitudes
-  if (context.habits.length > 0) {
-    const avgStreak = context.habits.reduce((sum: number, h: any) => sum + h.currentStreak, 0) / context.habits.length;
-    if (avgStreak < 3) {
-      return `${userName}, j'ai remarqué que tes habitudes ont du mal à décoller. Appliquons Atomic Habits ensemble: choisis UNE habitude et rendons-la ridiculement facile. Règle des 2 minutes: quelle version mini de cette habitude pourrais-tu faire en 2 min?`;
+    // Générer le message de reprise/démarrage
+    const existingMessages = session.messages.map(m => ({
+      role: m.role as string,
+      content: m.content,
+    }));
+
+    const sessionContext = formatSessionMessages(existingMessages);
+
+    const resumePrompt = existingMessages.length > 0
+      ? 'La session reprend après une pause. Fais un bref rappel de ce dont vous parliez et relance naturellement la conversation.'
+      : 'Nouvelle session. Salue l\'utilisateur et propose d\'explorer la zone la plus floue de son profil, ou continue l\'approfondissement.';
+
+    const llmResponse = await callCoachLLM(
+      buildCoachSystemPrompt(
+        session.profileSnapshot || profile,
+        profile.unclearZones,
+        sessionContext
+      ),
+      [{ role: 'user', content: resumePrompt }]
+    );
+
+    // Stocker le message du coach
+    await prisma.coachMessage.create({
+      data: {
+        sessionId: session.id,
+        role: 'coach',
+        content: llmResponse.reply,
+      },
+    });
+
+    res.json({
+      sessionId: session.id,
+      coachMessage: llmResponse.reply,
+      wisdomGained: session.wisdomGained,
+      status: 'active',
+    });
+  } catch (error) {
+    console.error('Erreur session start:', error);
+    res.status(500).json({ error: 'Erreur lors du démarrage de la session' });
+  }
+});
+
+// ============================================
+// 💬 POST /coach/session/:id/message
+// ============================================
+// Envoie un message au coach, reçoit la réponse
+
+router.post('/session/:id/message', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const sessionId = req.params.id;
+    const { message } = req.body;
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Message requis' });
     }
+
+    // Vérifier la session
+    const session = await prisma.coachSession.findUnique({
+      where: { id: sessionId },
+      include: { messages: { orderBy: { createdAt: 'asc' } } },
+    });
+
+    if (!session || session.userId !== userId) {
+      return res.status(404).json({ error: 'Session non trouvée' });
+    }
+    if (session.status === 'completed') {
+      return res.status(400).json({ error: 'Session terminée' });
+    }
+
+    // Stocker le message utilisateur
+    await prisma.coachMessage.create({
+      data: {
+        sessionId,
+        role: 'user',
+        content: message,
+      },
+    });
+
+    // Charger le profil pour le contexte
+    const profile = await prisma.coachProfile.findUnique({ where: { userId } });
+
+    // Construire les messages pour le LLM
+    const allMessages = [
+      ...session.messages.map(m => ({
+        role: m.role === 'coach' ? 'assistant' : m.role,
+        content: m.content,
+      })),
+      { role: 'user', content: message },
+    ];
+
+    // Filtrer pour le format LLM (user/assistant seulement)
+    const llmMessages = allMessages
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+    const sessionContext = formatSessionMessages(
+      allMessages.map(m => ({ role: m.role, content: m.content }))
+    );
+
+    const llmResponse = await callCoachLLM(
+      buildCoachSystemPrompt(
+        session.profileSnapshot || profile,
+        profile?.unclearZones,
+        sessionContext
+      ),
+      llmMessages
+    );
+
+    // Stocker la réponse du coach avec les metadata
+    await prisma.coachMessage.create({
+      data: {
+        sessionId,
+        role: 'coach',
+        content: llmResponse.reply,
+        insightScore: llmResponse.insightScore || 0,
+        zone: llmResponse.zone,
+      },
+    });
+
+    // Calculer la wisdom gagnée
+    const insightScore = llmResponse.insightScore || 0;
+    const wisdomPoints = Math.floor(insightScore / 5);
+
+    // Mettre à jour la session
+    await prisma.coachSession.update({
+      where: { id: sessionId },
+      data: {
+        wisdomGained: { increment: insightScore },
+        topic: llmResponse.zone || session.topic,
+      },
+    });
+
+    // Appliquer les updates du profil
+    if (llmResponse.profileUpdate) {
+      await applyProfileUpdate(userId, llmResponse.profileUpdate);
+    }
+    if (llmResponse.unclearZoneUpdate) {
+      await applyUnclearZoneUpdate(userId, llmResponse.unclearZoneUpdate);
+    }
+
+    // Mettre à jour la wisdom
+    await updateWisdom(userId, wisdomPoints);
+
+    // Gérer la proposition de projet si présente
+    let projectProposal = null;
+    if (llmResponse.projectProposal && llmResponse.projectProposal.step === 'validation') {
+      // Créer la proposition de projet en DB
+      projectProposal = await prisma.coachProjectProposal.create({
+        data: {
+          userId,
+          sessionId,
+          title: llmResponse.projectProposal.title || 'Nouveau projet',
+          description: llmResponse.projectProposal.description || '',
+          why: llmResponse.projectProposal.why || '',
+          type: llmResponse.projectProposal.type || 'alignment',
+          statsImpact: llmResponse.projectProposal.statsImpact || {},
+          status: 'proposed',
+        },
+      });
+    }
+
+    res.json({
+      coachMessage: llmResponse.reply,
+      insightScore,
+      wisdomGained: wisdomPoints,
+      zone: llmResponse.zone,
+      projectProposal: projectProposal || llmResponse.projectProposal,
+    });
+  } catch (error) {
+    console.error('Erreur message:', error);
+    res.status(500).json({ error: 'Erreur lors de l\'envoi du message' });
   }
+});
 
-  // Questions de vision
-  if (lowerMsg.includes('vision') || lowerMsg.includes('futur') || lowerMsg.includes('objectif')) {
-    return `Belle question! Ferme les yeux un instant... Imagine-toi dans 5 ans, vivant ta meilleure vie. Où es-tu? Que fais-tu? Qui t'entoure? Décris-moi cette scène en quelques mots.`;
+// ============================================
+// ⏸️ POST /coach/session/:id/pause
+// ============================================
+// Met en pause la session (appelé auto quand l'utilisateur quitte)
+
+router.post('/session/:id/pause', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const sessionId = req.params.id;
+
+    const session = await prisma.coachSession.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session || session.userId !== userId) {
+      return res.status(404).json({ error: 'Session non trouvée' });
+    }
+
+    if (session.status !== 'active') {
+      return res.json({ status: session.status, message: 'Session déjà en pause ou terminée' });
+    }
+
+    // Mettre en pause
+    await prisma.coachSession.update({
+      where: { id: sessionId },
+      data: { status: 'paused' },
+    });
+
+    // Mettre à jour le profil avec les insights de la session
+    const wisdomPoints = Math.floor(session.wisdomGained / 5);
+    if (wisdomPoints > 0) {
+      await updateWisdom(userId, wisdomPoints);
+    }
+
+    res.json({
+      status: 'paused',
+      wisdomGained: session.wisdomGained,
+    });
+  } catch (error) {
+    console.error('Erreur pause:', error);
+    res.status(500).json({ error: 'Erreur lors de la mise en pause' });
   }
+});
 
-  // Questions d'introspection
-  if (lowerMsg.includes('valeur') || lowerMsg.includes('important')) {
-    return `Question profonde 🤔. Pense à un moment récent où tu t'es senti vraiment vivant, aligné. Qu'est-ce qui se passait? Ça révèle souvent nos vraies valeurs.`;
+// ============================================
+// 👤 GET /coach/profile
+// ============================================
+// Retourne le profil complet + zones floues
+
+router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId!;
+
+    const [profile, stats, sessionCount] = await Promise.all([
+      prisma.coachProfile.findUnique({ where: { userId } }),
+      prisma.stats.findUnique({ where: { userId }, select: { wisdom: true } }),
+      prisma.coachSession.count({ where: { userId } }),
+    ]);
+
+    if (!profile) {
+      return res.json({
+        exists: false,
+        message: 'Aucun profil coach. Complète l\'onboarding pour commencer.',
+      });
+    }
+
+    res.json({
+      exists: true,
+      profile: {
+        ...profile,
+        wisdom: stats?.wisdom || 50,
+        totalSessions: sessionCount,
+      },
+    });
+  } catch (error) {
+    console.error('Erreur profil:', error);
+    res.status(500).json({ error: 'Erreur lors du chargement du profil' });
   }
+});
 
-  // Plan d'action
-  if (lowerMsg.includes('plan') || lowerMsg.includes('comment')) {
-    return `Excellente question! Plutôt que de fixer un objectif, créons un système. Si tu veux [X], quel comportement quotidien de 2 minutes pourrait t'y mener? L'identité d'abord: qui dois-tu devenir pour atteindre ça?`;
+// ============================================
+// ✅ POST /coach/project/:id/validate
+// ============================================
+// Valide une proposition → crée un Quest
+
+router.post('/project/:id/validate', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const proposalId = req.params.id;
+
+    const proposal = await prisma.coachProjectProposal.findUnique({
+      where: { id: proposalId },
+    });
+
+    if (!proposal || proposal.userId !== userId) {
+      return res.status(404).json({ error: 'Proposition non trouvée' });
+    }
+
+    if (proposal.status === 'validated') {
+      return res.status(400).json({ error: 'Proposition déjà validée' });
+    }
+
+    // Déterminer la catégorie de la quête selon le type et les stats impactées
+    const statsImpact = (proposal.statsImpact as Record<string, number>) || {};
+    let category: string = 'GENERAL';
+    const impactEntries = Object.entries(statsImpact).sort((a, b) => b[1] - a[1]);
+    if (impactEntries.length > 0) {
+      const topStat = impactEntries[0][0];
+      const statToCategory: Record<string, string> = {
+        body: 'BODY', mind: 'MIND', wisdom: 'WISDOM',
+        social: 'SOCIAL', love: 'LOVE', career: 'CAREER', finance: 'FINANCE',
+      };
+      category = statToCategory[topStat] || 'GENERAL';
+    }
+
+    // Créer la Quest
+    const quest = await prisma.quest.create({
+      data: {
+        userId,
+        title: proposal.title,
+        description: `${proposal.description}\n\n**Pourquoi :** ${proposal.why}`,
+        category: category as any,
+        difficulty: 'HARD',
+        xpReward: 50,
+        statBoost: 5,
+        status: 'ACTIVE',
+      },
+    });
+
+    // Mettre à jour la proposition
+    await prisma.coachProjectProposal.update({
+      where: { id: proposalId },
+      data: {
+        status: 'validated',
+        questId: quest.id,
+      },
+    });
+
+    res.json({
+      message: 'Projet validé et quête créée !',
+      quest,
+      proposal: { ...proposal, status: 'validated', questId: quest.id },
+    });
+  } catch (error) {
+    console.error('Erreur validation projet:', error);
+    res.status(500).json({ error: 'Erreur lors de la validation du projet' });
   }
+});
 
-  // Réponse générique intelligente
-  return `Intéressant, ${userName}. Je t'écoute. Continue... qu'est-ce que ça signifie pour toi? Qu'est-ce que ça révèle sur ce qui compte vraiment?`;
-}
+// ============================================
+// ❌ POST /coach/project/:id/reject
+// ============================================
+// Rejette une proposition
 
-function getSuggestedActions(context: any): string[] {
-  const suggestions: string[] = [];
+router.post('/project/:id/reject', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const proposalId = req.params.id;
 
-  if (context.habits.length === 0) {
-    suggestions.push('Crée ta première habitude');
+    const proposal = await prisma.coachProjectProposal.findUnique({
+      where: { id: proposalId },
+    });
+
+    if (!proposal || proposal.userId !== userId) {
+      return res.status(404).json({ error: 'Proposition non trouvée' });
+    }
+
+    await prisma.coachProjectProposal.update({
+      where: { id: proposalId },
+      data: { status: 'rejected' },
+    });
+
+    res.json({ message: 'Proposition rejetée', status: 'rejected' });
+  } catch (error) {
+    console.error('Erreur rejet projet:', error);
+    res.status(500).json({ error: 'Erreur lors du rejet du projet' });
   }
-
-  if (context.quests.length === 0) {
-    suggestions.push('Définis une quête pour cette semaine');
-  }
-
-  if (context.journalEntries.length === 0) {
-    suggestions.push('Écris ton premier journal');
-  }
-
-  if (context.stats.currentStreak === 0) {
-    suggestions.push('Lance ton streak dès aujourd\'hui!');
-  }
-
-  return suggestions.length > 0 ? suggestions : ['Continue ton excellente progression!'];
-}
+});
 
 export default router;

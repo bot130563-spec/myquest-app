@@ -171,16 +171,16 @@ const ACHIEVEMENTS: AchievementDef[] = [
     icon: '⚖️',
     category: 'stats',
     xpReward: 150,
-    condition: (s) => s.health >= 50 && s.energy >= 50 && s.wisdom >= 50 && s.social >= 50 && s.wealth >= 50
+    condition: (s) => s.body >= 50 && s.mind >= 50 && s.wisdom >= 50 && s.social >= 50 && s.love >= 50 && s.career >= 50 && s.finance >= 50
   },
   {
     id: 'health_max',
     name: 'Corps de Titan',
-    description: 'Atteins 100 en Santé',
-    icon: '❤️',
+    description: 'Atteins 100 en Corps',
+    icon: '💪',
     category: 'stats',
     xpReward: 200,
-    condition: (s) => s.health >= 100
+    condition: (s) => s.body >= 100
   },
   {
     id: 'wisdom_max',

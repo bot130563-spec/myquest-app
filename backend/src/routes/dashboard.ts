@@ -138,10 +138,10 @@ router.get('/', async (req: Request, res: Response) => {
     
     // ── 7. CALCUL SCORE GLOBAL ──
     const stats = user.stats;
-    const coreStats = stats 
-      ? [stats.health, stats.energy, stats.wisdom, stats.social, stats.wealth]
-      : [50, 50, 50, 50, 50];
-    const globalScore = Math.round(coreStats.reduce((a, b) => a + b, 0) / 5);
+    const coreStats = stats
+      ? [stats.body, stats.mind, stats.wisdom, stats.social, stats.love, stats.career, stats.finance]
+      : [50, 50, 50, 50, 50, 50, 50];
+    const globalScore = Math.round(coreStats.reduce((a, b) => a + b, 0) / 7);
     
     // ── RÉPONSE ──
     res.json({
@@ -163,11 +163,13 @@ router.get('/', async (req: Request, res: Response) => {
       
       // Stats
       stats: {
-        health: stats?.health || 50,
-        energy: stats?.energy || 50,
+        body: stats?.body || 50,
+        mind: stats?.mind || 50,
         wisdom: stats?.wisdom || 50,
         social: stats?.social || 50,
-        wealth: stats?.wealth || 50,
+        love: stats?.love || 50,
+        career: stats?.career || 50,
+        finance: stats?.finance || 50,
         globalScore,
         currentStreak: stats?.currentStreak || 0,
         longestStreak: stats?.longestStreak || 0,

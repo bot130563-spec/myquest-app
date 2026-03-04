@@ -87,6 +87,9 @@ model User {
   // Un user a PLUSIEURS sessions de coaching (relation 1:N)
   coachSessions CoachSession[]
 
+  // Un user a PLUSIEURS propositions de projets du coach (relation 1:N)
+  coachProjects CoachProjectProposal[]
+
   // @@map renomme la table en "users" (convention: pluriel, minuscule)
   @@map("users")
 }
@@ -137,55 +140,46 @@ model Avatar {
 }
 
 // ============================================
-// 📊 MODEL STATS - Statistiques de vie
+// 📊 MODEL STATS - Les 7 dimensions de vie
 // ============================================
-// Les stats représentent les différents aspects de la vie
-// de l'utilisateur, façon jeu de rôle (0-100 pour chaque)
+// Chaque dimension va de 0 à 100.
+// Anciennes stats (health, energy, wealth) remplacées par
+// body, mind, finance + ajout love et career.
 
 model Stats {
   id        String   @id @default(cuid())
-  
+
   // Lien vers l'utilisateur (1:1)
   userId    String   @unique
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // ── STATS PRINCIPALES (échelle 0-100) ──
-  
-  // 💪 HEALTH - Santé physique
-  // Augmente: sport, sommeil, alimentation saine
-  // Diminue: maladie, mauvaises habitudes
-  health    Int      @default(50)
-  
-  // ⚡ ENERGY - Énergie mentale / motivation
-  // Augmente: accomplissements, repos, méditation
-  // Diminue: stress, surmenage, procrastination
-  energy    Int      @default(50)
-  
-  // 📚 WISDOM - Connaissances & apprentissage
-  // Augmente: lecture, cours, apprentissage de skills
-  // Diminue: stagnation (décroit lentement si pas actif)
+
+  // ── LES 7 DIMENSIONS (0-100) ──
+
+  // 💪 Corps — santé physique, sport, sommeil, alimentation
+  body      Int      @default(50)
+
+  // 🧠 Esprit — santé mentale, émotions, stress, paix intérieure
+  mind      Int      @default(50)
+
+  // 📚 Sagesse — apprentissage, connaissance de soi, introspection
   wisdom    Int      @default(50)
-  
-  // 👥 SOCIAL - Relations & connexions
-  // Augmente: sorties, appels, aider les autres
-  // Diminue: isolation, conflits
+
+  // 👥 Social — amis, famille, réseau, vie sociale
   social    Int      @default(50)
-  
-  // 💰 WEALTH - Santé financière
-  // Augmente: épargne, investissement, revenus
-  // Diminue: dépenses excessives, dettes
-  wealth    Int      @default(50)
-  
-  // ── STREAKS (séries consécutives) ──
-  
-  // Nombre de jours consécutifs avec activité
-  // Se remet à 0 si l'utilisateur skip un jour
+
+  // ❤️ Amour — couple, intimité, connexion profonde
+  love      Int      @default(50)
+
+  // 🎯 Carrière — travail, projets, ambition, compétences
+  career    Int      @default(50)
+
+  // 💰 Finances — argent, patrimoine, sécurité financière
+  finance   Int      @default(50)
+
+  // ── STREAKS ──
   currentStreak Int  @default(0)
-  
-  // Record personnel de streak
-  // Utile pour les achievements "streak de 30 jours"
   longestStreak Int  @default(0)
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -237,14 +231,20 @@ model Quest {
 
 // ── ENUMS ──
 
-// Catégories de quêtes (liées aux stats)
+// Catégories de quêtes (liées aux 7 dimensions)
 enum QuestCategory {
-  HEALTH    // 💪 Santé physique
-  ENERGY    // ⚡ Énergie mentale, motivation
-  WISDOM    // 📚 Apprentissage, lecture
-  SOCIAL    // 👥 Relations, sorties
-  WEALTH    // 💰 Finances, travail
-  GENERAL   // ⭐ Général (pas de stat spécifique)
+  BODY      // 💪 Corps
+  MIND      // 🧠 Esprit
+  WISDOM    // 📚 Sagesse
+  SOCIAL    // 👥 Social
+  LOVE      // ❤️ Amour
+  CAREER    // 🎯 Carrière
+  FINANCE   // 💰 Finances
+  GENERAL   // ⭐ Général
+  // Anciennes valeurs conservées pour compatibilité des données existantes
+  HEALTH    // @deprecated → utiliser BODY
+  ENERGY    // @deprecated → utiliser MIND
+  WEALTH    // @deprecated → utiliser FINANCE
 }
 
 // Niveaux de difficulté
@@ -414,119 +414,138 @@ model JournalEntry {
 // Note: On utilise Int (1-5) plutôt qu'un enum pour plus de flexibilité
 
 // ============================================
-// 🤖 MODEL COACHPROFILE - Profil de coaching personnalisé
+// 🤖 MODEL COACHPROFILE - Profil Coach V2
 // ============================================
-// Stocke l'état du coaching, la phase actuelle et les insights
-// de l'agent coach pour chaque utilisateur
+// Profil synthétique généré par le LLM après analyse des réponses.
+// Stocke valeurs, forces, ombres, rapport chaos/ordre et vision.
 
 model CoachProfile {
-  id            String   @id @default(cuid())
+  id             String   @id @default(cuid())
 
   // Lien vers l'utilisateur (1:1)
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ── PHASE ACTUELLE DU COACHING ──
-  // 1 = Connaissance de soi (introspection)
-  // 2 = Vision et ambitions
-  // 3 = Diagnostic des habitudes (Atomic Habits)
-  // 4 = Plan d'action et suivi
-  currentPhase  Int      @default(1)
+  // ── PROFIL SYNTHÉTIQUE (JSON généré par le LLM) ──
+  values         Json?    // Valeurs dominantes identifiées
+  strengths      Json?    // Forces naturelles
+  shadows        Json?    // Zones d'ombre / faiblesses reconnues
+  chaosOrder     Json?    // Rapport chaos/ordre (Maps of Meaning)
+  vision         Json?    // Vision future
+  summary        String?  @db.Text  // Portrait synthétique texte libre
 
-  // ── PHASE 1: INTROSPECTION ──
-  // Valeurs profondes identifiées (JSON array)
-  // Ex: ["authenticité", "liberté", "impact", "famille", "créativité"]
-  values        Json?
+  // ── TRACKING DES ZONES FLOUES ──
+  // [{zone: "values", clarity: 0.3, reason: "réponses vagues"}]
+  unclearZones   Json?
 
-  // Forces et talents naturels (JSON array)
-  // Ex: ["communication", "résolution de problèmes", "empathie"]
-  strengths     Json?
-
-  // Croyances limitantes vs croyances ressources (JSON object)
-  // Ex: { "limitantes": ["Je ne suis pas assez..."], "ressources": ["Je peux apprendre"] }
-  beliefs       Json?
-
-  // ── PHASE 2: VISION ──
-  // Vision à court terme (3 mois)
-  vision3m      String?
-
-  // Vision à moyen terme (1 an)
-  vision1y      String?
-
-  // Vision à long terme (5 ans)
-  vision5y      String?
-
-  // Résultat ikigai (JSON object)
-  // Ex: { "passion": "...", "mission": "...", "vocation": "...", "profession": "..." }
-  ikigai        Json?
-
-  // ── PHASE 3: ANALYSE DES HABITUDES ──
-  // Patterns comportementaux détectés (JSON array)
-  // Ex: [{ "habit": "sport", "pattern": "fort le matin", "recommendation": "..." }]
-  habitPatterns Json?
-
-  // 3 habitudes clés identifiées pour atteindre la vision (JSON array)
-  // Ex: [{ "title": "Méditer 10min", "why": "...", "cue": "...", "reward": "..." }]
-  keyHabits     Json?
-
-  // ── HISTORIQUE ET NOTES ──
-  // Nombre total de sessions de coaching
-  totalSessions Int      @default(0)
-
-  // Date de la dernière session
-  lastSessionAt DateTime?
-
-  // Notes accumulées par le coach (JSON array)
-  // Ex: [{ "date": "...", "insight": "...", "action": "..." }]
-  coachNotes    Json?
-
-  // Résultat du Wheel of Life (JSON object)
-  // Ex: { "santé": 7, "relations": 8, "carrière": 5, ... }
-  wheelOfLife   Json?
+  // ── PHASE ET ÉTAT ──
+  currentPhase   Int      @default(1) // 1=connaissance, 2=vision, 3=habitudes, 4=action
+  onboardingDone Boolean  @default(false)
 
   // ── TIMESTAMPS ──
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@map("coach_profiles")
 }
 
 // ============================================
-// 💬 MODEL COACHSESSION - Sessions de coaching
+// 💬 MODEL COACHSESSION - Session de coaching V2
 // ============================================
-// Stocke l'historique des conversations avec le coach
+// Session auto-saved avec pause/resume transparente.
 
 model CoachSession {
-  id         String   @id @default(cuid())
+  id              String   @id @default(cuid())
 
   // Lien vers l'utilisateur
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Phase du coaching lors de cette session
-  phase      Int
+  // ── ÉTAT DE LA SESSION ──
+  status          String   @default("active") // active, paused, completed
+  phase           Int      @default(1)
+  topic           String?  // Sujet principal identifié par le LLM
 
-  // Historique des messages de la conversation (JSON array)
-  // Ex: [{ "role": "user", "content": "..." }, { "role": "assistant", "content": "..." }]
-  messages   Json
+  // Sagesse gagnée dans cette session
+  wisdomGained    Int      @default(0)
 
-  // Insights extraits de la session (JSON array)
-  // Ex: ["L'utilisateur se sent bloqué par...", "Force identifiée: ..."]
-  insights   Json?
+  // Snapshot du profil au début de session
+  profileSnapshot Json?
 
-  // Actions définies lors de la session (JSON array)
-  // Ex: [{ "action": "Commencer par 2min de méditation", "deadline": "..." }]
-  actions    Json?
-
-  // Résumé de la session (généré par le coach)
-  summary    String?  @db.Text
+  // Relation vers les messages individuels
+  messages        CoachMessage[]
 
   // ── TIMESTAMPS ──
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  startedAt       DateTime @default(now())
+  endedAt         DateTime?
+  updatedAt       DateTime @updatedAt
 
   @@map("coach_sessions")
-  @@index([userId, createdAt])
+  @@index([userId, status])
+}
+
+// ============================================
+// 💬 MODEL COACHMESSAGE - Message de coaching
+// ============================================
+// Chaque message échangé avec le coach.
+
+model CoachMessage {
+  id           String   @id @default(cuid())
+
+  // Lien vers la session
+  sessionId    String
+  session      CoachSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Contenu du message
+  role         String   // "user" | "coach" | "system"
+  content      String   @db.Text
+
+  // Metadata scoring (rempli par le LLM pour les messages "user")
+  insightScore Int?     // 0-10, profondeur de la réponse
+  zone         String?  // Quelle zone du profil cette réponse concerne
+
+  createdAt    DateTime @default(now())
+
+  @@map("coach_messages")
+  @@index([sessionId, createdAt])
+}
+
+// ============================================
+// 📋 MODEL COACHPROJECTPROPOSAL - Proposition de projet
+// ============================================
+// Projet généré par le coach, en attente de validation utilisateur.
+
+model CoachProjectProposal {
+  id          String   @id @default(cuid())
+
+  // Lien vers l'utilisateur
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Session ayant généré la proposition (optionnel)
+  sessionId   String?
+
+  // ── CONTENU ──
+  title       String
+  description String   @db.Text
+  why         String   @db.Text  // Lien avec le profil
+  type        String   // remediation | amplification | alignment | confrontation | vision
+
+  // Stats impactées — ex: {wisdom: 2, social: 3}
+  statsImpact Json?
+
+  // ── STATUS ──
+  status      String   @default("proposed") // proposed | discussing | validated | rejected
+
+  // Si validé → référence vers le Quest créé
+  questId     String?
+
+  // ── TIMESTAMPS ──
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("coach_project_proposals")
+  @@index([userId, status])
 }
 
 // ============================================

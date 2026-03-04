@@ -183,7 +183,7 @@ describe('Habit Routes', () => {
       const mockStats = {
         id: 'stats-1',
         userId,
-        energy: 60,
+        mind: 60,
       };
 
       (prisma.habit.findFirst as jest.Mock).mockResolvedValue(mockHabit);

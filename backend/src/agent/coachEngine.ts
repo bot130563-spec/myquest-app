@@ -1,11 +1,10 @@
 /**
  * ==========================================
- * 🤖 COACH ENGINE - Agent de coaching indépendant
+ * 🤖 COACH ENGINE - Agent de coaching (V2 compatible)
  * ==========================================
  *
  * Ce module implémente le moteur de l'agent coach de vie.
- * Il construit le contexte utilisateur, génère des system prompts dynamiques,
- * et gère les conversations avec le LLM.
+ * Mis à jour pour les 7 dimensions et le schema Coach V2.
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -35,11 +34,13 @@ interface UserContext {
     content: string | null;
   }>;
   stats: {
-    health: number;
-    energy: number;
+    body: number;
+    mind: number;
     wisdom: number;
     social: number;
-    wealth: number;
+    love: number;
+    career: number;
+    finance: number;
     currentStreak: number;
     longestStreak: number;
   } | null;
@@ -51,9 +52,12 @@ interface UserContext {
   profile: {
     currentPhase: number;
     values: any;
-    vision1y: string | null;
-    coachNotes: any;
-    wheelOfLife: any;
+    strengths: any;
+    shadows: any;
+    chaosOrder: any;
+    vision: any;
+    summary: string | null;
+    onboardingDone: boolean;
   } | null;
 }
 
@@ -83,7 +87,6 @@ interface HabitAnalysis {
  * pour alimenter le system prompt
  */
 export async function buildContext(userId: string): Promise<UserContext> {
-  // Charger les données utilisateur
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -96,51 +99,29 @@ export async function buildContext(userId: string): Promise<UserContext> {
     throw new Error('User not found');
   }
 
-  // Charger les habitudes actives
   const habits = await prisma.habit.findMany({
-    where: {
-      userId,
-      isActive: true,
-    },
+    where: { userId, isActive: true },
     select: {
       title: true,
       streakCount: true,
       lastCompletedAt: true,
       category: true,
     },
-    orderBy: {
-      streakCount: 'desc',
-    },
+    orderBy: { streakCount: 'desc' },
   });
 
-  // Charger les 5 dernières entrées de journal
   const journal = await prisma.journalEntry.findMany({
     where: { userId },
-    select: {
-      entryDate: true,
-      mood: true,
-      content: true,
-    },
-    orderBy: {
-      entryDate: 'desc',
-    },
+    select: { entryDate: true, mood: true, content: true },
+    orderBy: { entryDate: 'desc' },
     take: 5,
   });
 
-  // Charger les quêtes actives
   const quests = await prisma.quest.findMany({
-    where: {
-      userId,
-      status: 'ACTIVE',
-    },
-    select: {
-      title: true,
-      status: true,
-      dueDate: true,
-    },
+    where: { userId, status: 'ACTIVE' },
+    select: { title: true, status: true, dueDate: true },
   });
 
-  // Charger le profil coach (ou null si pas encore créé)
   const profile = await prisma.coachProfile.findUnique({
     where: { userId },
   });
@@ -163,11 +144,13 @@ export async function buildContext(userId: string): Promise<UserContext> {
       content: j.content,
     })),
     stats: user.stats ? {
-      health: user.stats.health,
-      energy: user.stats.energy,
+      body: user.stats.body,
+      mind: user.stats.mind,
       wisdom: user.stats.wisdom,
       social: user.stats.social,
-      wealth: user.stats.wealth,
+      love: user.stats.love,
+      career: user.stats.career,
+      finance: user.stats.finance,
       currentStreak: user.stats.currentStreak,
       longestStreak: user.stats.longestStreak,
     } : null,
@@ -179,9 +162,12 @@ export async function buildContext(userId: string): Promise<UserContext> {
     profile: profile ? {
       currentPhase: profile.currentPhase,
       values: profile.values,
-      vision1y: profile.vision1y,
-      coachNotes: profile.coachNotes,
-      wheelOfLife: profile.wheelOfLife,
+      strengths: profile.strengths,
+      shadows: profile.shadows,
+      chaosOrder: profile.chaosOrder,
+      vision: profile.vision,
+      summary: profile.summary,
+      onboardingDone: profile.onboardingDone,
     } : null,
   };
 }
@@ -190,20 +176,20 @@ export async function buildContext(userId: string): Promise<UserContext> {
  * Construit le system prompt avec le contexte utilisateur
  */
 export function buildSystemPrompt(context: UserContext, phase: number): string {
-  const basePrompt = `Tu es un coach de vie expert qui combine plusieurs approches éprouvées:
+  return `Tu es un coach de vie expert qui combine plusieurs approches éprouvées:
 - Atomic Habits (James Clear) pour la transformation par les habitudes
-- Introspection structurée pour la connaissance de soi
-- Ikigai pour la définition du sens et de la vision
-- Wheel of Life pour l'équilibre des domaines de vie
-- Psychologie positive (PERMA) pour le bien-être durable
+- Maps of Meaning (Peterson) : chaos/ordre, archétype du héros
+- Self-Authoring (Peterson) : écriture réflexive passé/présent/futur
+- Logothérapie (Frankl) : le sens émerge de l'engagement
+- Psychologie jungienne : ombre, individuation
 
 ## Ton rôle
 
 Tu accompagnes l'utilisateur dans un parcours structuré en 4 phases:
-1. CONNAISSANCE DE SOI - Explorer valeurs, forces, croyances
-2. VISION ET AMBITIONS - Définir une vision à 3 mois, 1 an, 5 ans
+1. CONNAISSANCE DE SOI - Explorer valeurs, forces, ombres
+2. VISION ET AMBITIONS - Définir une vision claire
 3. DIAGNOSTIC DES HABITUDES - Analyser et optimiser selon Atomic Habits
-4. PLAN D'ACTION - Définir 3 habitudes clés et suivre les progrès
+4. PLAN D'ACTION - Projets concrets issus de l'introspection
 
 ## Style de communication
 
@@ -230,8 +216,8 @@ ${context.journal.length > 0 ? context.journal.map(j =>
   `- ${j.date.toISOString().split('T')[0]}: Humeur ${j.mood}/5 — ${j.content ? j.content.substring(0, 100) + '...' : 'Pas de contenu'}`
 ).join('\n') : 'Aucune entrée de journal récente.'}
 
-### Stats actuelles
-${context.stats ? `Santé: ${context.stats.health}/100, Énergie: ${context.stats.energy}/100, Sagesse: ${context.stats.wisdom}/100, Social: ${context.stats.social}/100, Finances: ${context.stats.wealth}/100
+### Stats actuelles (7 dimensions)
+${context.stats ? `Corps: ${context.stats.body}/100, Esprit: ${context.stats.mind}/100, Sagesse: ${context.stats.wisdom}/100, Social: ${context.stats.social}/100, Amour: ${context.stats.love}/100, Carrière: ${context.stats.career}/100, Finances: ${context.stats.finance}/100
 Streak actuel: ${context.stats.currentStreak} jour(s), Record: ${context.stats.longestStreak}` : 'Stats non disponibles'}
 
 ### Quêtes actives
@@ -241,17 +227,18 @@ ${context.quests.length > 0 ? context.quests.map(q =>
 
 ### Profil coaching
 ${context.profile ? `
-Valeurs identifiées: ${context.profile.values ? JSON.stringify(context.profile.values) : 'Non définies'}
-Vision 1 an: ${context.profile.vision1y || 'Non définie'}
-Wheel of Life: ${context.profile.wheelOfLife ? JSON.stringify(context.profile.wheelOfLife) : 'Non remplie'}
-Notes précédentes: ${context.profile.coachNotes ? JSON.stringify(context.profile.coachNotes).substring(0, 200) : 'Aucune'}
+Valeurs: ${context.profile.values ? JSON.stringify(context.profile.values) : 'Non définies'}
+Forces: ${context.profile.strengths ? JSON.stringify(context.profile.strengths) : 'Non définies'}
+Ombres: ${context.profile.shadows ? JSON.stringify(context.profile.shadows) : 'Non explorées'}
+Rapport chaos/ordre: ${context.profile.chaosOrder ? JSON.stringify(context.profile.chaosOrder) : 'Non défini'}
+Vision: ${context.profile.vision ? JSON.stringify(context.profile.vision) : 'Non définie'}
+Résumé: ${context.profile.summary || 'Aucun résumé'}
+Onboarding: ${context.profile.onboardingDone ? 'Complété' : 'En cours'}
 ` : 'Profil coaching non initialisé — première session.'}
 
 ## Ta mission actuelle
 
 ${getPhaseInstructions(phase)}`;
-
-  return basePrompt;
 }
 
 /**
@@ -265,8 +252,8 @@ function getPhaseInstructions(phase: number): string {
 Tu aides l'utilisateur à explorer:
 - Ses valeurs profondes (qu'est-ce qui compte vraiment?)
 - Ses forces naturelles et talents
-- Ses croyances limitantes et ressources
-- Ses patterns émotionnels
+- Ses zones d'ombre (faiblesses reconnues, patterns à transformer)
+- Son rapport chaos/ordre (Maps of Meaning)
 
 Pose des questions qui invitent à la réflexion. Évite les réponses toutes faites.`;
 
@@ -274,11 +261,11 @@ Pose des questions qui invitent à la réflexion. Évite les réponses toutes fa
       return `Phase 2 - VISION ET AMBITIONS
 
 Tu aides l'utilisateur à construire une vision claire:
-- Vision 3 mois: objectifs concrets et mesurables
-- Vision 1 an: transformation souhaitée
-- Vision 5 ans: la personne qu'il veut devenir
+- Qui veut-il devenir dans 5 ans?
+- Quel pont entre le moi actuel et le moi idéal?
+- Quelles dimensions de vie prioriser?
 
-Utilise l'ikigai pour explorer l'intersection passion/mission/vocation/profession.`;
+Utilise l'approche Self-Authoring de Peterson.`;
 
     case 3:
       return `Phase 3 - DIAGNOSTIC DES HABITUDES
@@ -292,13 +279,13 @@ Analyse les habitudes selon les 4 lois d'Atomic Habits:
 Identifie les patterns de succès et les points de friction.`;
 
     case 4:
-      return `Phase 4 - PLAN D'ACTION
+      return `Phase 4 - PLAN D'ACTION ET PROJETS
 
 Aide l'utilisateur à:
-- Définir 3 habitudes clés alignées sur sa vision
+- Transformer les insights en projets concrets
+- Types de projets : remédiation, amplification, alignement, confrontation, vision
+- Chaque projet impacte les 7 dimensions de vie
 - Créer des systèmes (pas juste des objectifs)
-- Suivre les progrès et ajuster
-- Célébrer les victoires
 
 Focus sur l'amélioration continue de 1% par jour.`;
 
@@ -321,7 +308,7 @@ async function callLLM(systemPrompt: string, messages: Message[]): Promise<strin
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: 'claude-3-haiku-20240307',
+          model: 'claude-sonnet-4-20250514',
           max_tokens: 1024,
           system: systemPrompt,
           messages: messages,
@@ -338,11 +325,9 @@ async function callLLM(systemPrompt: string, messages: Message[]): Promise<strin
       return data.content[0].text as string;
     } catch (error) {
       console.error('Error calling Anthropic API:', error);
-      // Fallback au mock en cas d'erreur
       return generateMockResponse(systemPrompt, messages);
     }
   } else {
-    // Mode mock intelligent
     return generateMockResponse(systemPrompt, messages);
   }
 }
@@ -350,15 +335,12 @@ async function callLLM(systemPrompt: string, messages: Message[]): Promise<strin
 /**
  * Génère une réponse mock intelligente basée sur le contexte
  */
-function generateMockResponse(systemPrompt: string, messages: Message[]): string {
+function generateMockResponse(_systemPrompt: string, messages: Message[]): string {
   const lastUserMessage = messages.filter(m => m.role === 'user').pop();
   const userMessage = lastUserMessage?.content.toLowerCase() || '';
 
-  // Détecte les patterns dans le message utilisateur
   if (userMessage.includes('bonjour') || userMessage.includes('salut') || messages.length === 1) {
     return `Bonjour ! 👋 Je suis ravi de t'accompagner dans ton parcours de développement personnel.
-
-Je vois que tu es actuellement en phase ${systemPrompt.includes('Phase 1') ? '1 (Connaissance de soi)' : systemPrompt.includes('Phase 2') ? '2 (Vision)' : systemPrompt.includes('Phase 3') ? '3 (Habitudes)' : '4 (Action)'}.
 
 Comment te sens-tu aujourd'hui ? Qu'est-ce qui t'amène à me parler ?`;
   }
@@ -368,15 +350,11 @@ Comment te sens-tu aujourd'hui ? Qu'est-ce qui t'amène à me parler ?`;
 
 Prends un moment pour réfléchir: quand tu te sens vraiment aligné et épanoui, quelles sont les choses qui sont présentes dans ta vie?
 
-Est-ce la liberté? L'authenticité? L'impact sur les autres? La créativité? Le défi?
-
 Nomme-moi 2-3 choses qui te viennent spontanément à l'esprit.`;
   }
 
   if (userMessage.includes('habitude') || userMessage.includes('streak')) {
-    return `Je vois que tu as quelques habitudes en cours. C'est super! 💪
-
-La clé du succès avec les habitudes, c'est de les rendre:
+    return `La clé du succès avec les habitudes, c'est de les rendre:
 1. **Évidentes** - Un signal clair déclenche l'action
 2. **Attrayantes** - Tu dois avoir envie de les faire
 3. **Faciles** - Règle des 2 minutes pour commencer
@@ -386,115 +364,86 @@ Quelle est l'habitude qui te pose le plus de difficultés en ce moment?`;
   }
 
   if (userMessage.includes('vision') || userMessage.includes('futur') || userMessage.includes('objectif')) {
-    return `Parlons de ta vision! 🎯
-
-Imagine-toi dans 1 an. Tout s'est super bien passé. Tu es devenu la meilleure version de toi-même.
-
-- Qu'est-ce qui a changé dans ta vie?
-- Qu'est-ce que tu fais différemment?
-- Comment te sens-tu?
+    return `Imagine-toi dans 5 ans, vivant ta meilleure vie. Où es-tu? Que fais-tu? Qui t'entoure?
 
 Raconte-moi cette vision, même si elle te semble un peu folle!`;
   }
 
-  if (userMessage.includes('difficulté') || userMessage.includes('problème') || userMessage.includes('bloqué')) {
-    return `Je comprends que tu rencontres des difficultés. C'est normal, et c'est même un signe que tu pousses tes limites! 💪
-
-Essayons de décortiquer ça ensemble:
-- Quel est exactement le défi que tu rencontres?
-- Qu'est-ce que tu as déjà essayé?
-- Y a-t-il eu des moments où c'était plus facile? Qu'est-ce qui était différent?
-
-Parle-moi de ce qui te bloque le plus.`;
-  }
-
-  // Réponse générique encourageante
   return `Merci de partager ça avec moi! 🙏
 
-Ce que tu dis est intéressant. Pour t'aider au mieux, j'aimerais creuser un peu plus:
-
 ${userMessage.length < 20 ?
-  'Peux-tu développer un peu plus ta pensée? Qu\'est-ce qui te vient à l\'esprit quand tu penses à ça?' :
-  'Qu\'est-ce que ça représente pour toi concrètement? Comment ça se manifeste dans ton quotidien?'}
+    'Peux-tu développer un peu plus ta pensée?' :
+    'Qu\'est-ce que ça représente pour toi concrètement?'}
 
-N'hésite pas à être aussi précis que possible. Plus j'en sais, mieux je peux t'accompagner!`;
+N'hésite pas à être aussi précis que possible.`;
 }
 
 /**
- * Gère une conversation avec le coach
+ * Gère une conversation avec le coach (V2 — utilise CoachMessage)
  */
 export async function chat(
   userId: string,
   message: string,
   sessionId?: string
 ): Promise<ChatResponse> {
-  // Charger ou créer la session
   let session;
 
   if (sessionId) {
     session = await prisma.coachSession.findUnique({
       where: { id: sessionId },
+      include: { messages: { orderBy: { createdAt: 'asc' } } },
     });
 
     if (!session || session.userId !== userId) {
       throw new Error('Session not found or unauthorized');
     }
   } else {
-    // Créer une nouvelle session
     const profile = await prisma.coachProfile.findUnique({
       where: { userId },
     });
-
     const currentPhase = profile?.currentPhase || 1;
 
     session = await prisma.coachSession.create({
       data: {
         userId,
         phase: currentPhase,
-        messages: [],
+        status: 'active',
       },
+      include: { messages: true },
     });
   }
 
-  // Récupérer l'historique des messages
-  const messages: Message[] = Array.isArray(session.messages)
-    ? (session.messages as any[]).map((m: any) => ({
-        role: m.role,
-        content: m.content,
-      }))
-    : [];
-  messages.push({ role: 'user', content: message });
+  // Stocker le message utilisateur
+  await prisma.coachMessage.create({
+    data: {
+      sessionId: session.id,
+      role: 'user',
+      content: message,
+    },
+  });
+
+  // Construire les messages pour le LLM à partir des CoachMessages
+  const existingMessages: Message[] = (session.messages || [])
+    .filter((m: any) => m.role === 'user' || m.role === 'coach')
+    .map((m: any) => ({
+      role: m.role === 'coach' ? 'assistant' as const : 'user' as const,
+      content: m.content,
+    }));
+  existingMessages.push({ role: 'user', content: message });
 
   // Construire le contexte et le system prompt
   const context = await buildContext(userId);
   const systemPrompt = buildSystemPrompt(context, session.phase);
 
   // Appeler le LLM
-  const assistantMessage = await callLLM(systemPrompt, messages);
+  const assistantMessage = await callLLM(systemPrompt, existingMessages);
 
-  // Sauvegarder la réponse
-  messages.push({ role: 'assistant', content: assistantMessage });
-
-  await prisma.coachSession.update({
-    where: { id: session.id },
+  // Stocker la réponse du coach
+  await prisma.coachMessage.create({
     data: {
-      messages: messages as any,
-      updatedAt: new Date(),
-    },
-  });
-
-  // Mettre à jour le profil coach
-  await prisma.coachProfile.upsert({
-    where: { userId },
-    create: {
-      userId,
-      currentPhase: 1,
-      totalSessions: 1,
-      lastSessionAt: new Date(),
-    },
-    update: {
-      totalSessions: { increment: 1 },
-      lastSessionAt: new Date(),
+      sessionId: session.id,
+      role: 'coach',
+      content: assistantMessage,
     },
   });
 
@@ -508,14 +457,13 @@ export async function chat(
  * Analyse les habitudes selon Atomic Habits
  */
 export async function analyzeHabits(userId: string): Promise<HabitAnalysis[]> {
-  // Récupérer toutes les habitudes de l'utilisateur
   const habits = await prisma.habit.findMany({
     where: { userId },
     include: {
       logs: {
         where: {
           completedDate: {
-            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 derniers jours
+            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
           },
         },
       },
@@ -536,16 +484,15 @@ export async function analyzeHabits(userId: string): Promise<HabitAnalysis[]> {
 
     const recommendations: string[] = [];
 
-    // Générer des recommandations basées sur les 4 lois d'Atomic Habits
     if (consistency < 70) {
       if (consistency < 40) {
-        recommendations.push('1. RENDRE ÉVIDENT: Ajoute un rappel visuel à un endroit stratégique (post-it, alarme)');
-        recommendations.push('2. RENDRE FACILE: Réduis cette habitude à sa version "2 minutes" pour faciliter le démarrage');
+        recommendations.push('1. RENDRE ÉVIDENT: Ajoute un rappel visuel à un endroit stratégique');
+        recommendations.push('2. RENDRE FACILE: Réduis cette habitude à sa version "2 minutes"');
       }
-      recommendations.push('3. RENDRE ATTRAYANT: Associe cette habitude à quelque chose que tu aimes déjà (habit stacking)');
-      recommendations.push('4. RENDRE SATISFAISANT: Célèbre chaque complétion avec un petit rituel de victoire');
+      recommendations.push('3. RENDRE ATTRAYANT: Associe cette habitude à quelque chose que tu aimes');
+      recommendations.push('4. RENDRE SATISFAISANT: Célèbre chaque complétion');
     } else {
-      recommendations.push('✅ Excellente consistance! Continue ainsi et augmente graduellement la difficulté.');
+      recommendations.push('✅ Excellente consistance! Augmente graduellement la difficulté.');
     }
 
     analyses.push({
@@ -560,62 +507,53 @@ export async function analyzeHabits(userId: string): Promise<HabitAnalysis[]> {
 }
 
 /**
- * Retourne le flow d'onboarding
+ * Retourne le flow d'onboarding V2
  */
 export async function getOnboarding(userId: string) {
   const profile = await prisma.coachProfile.findUnique({
     where: { userId },
   });
 
-  // Si profil existe et onboarding terminé, retourner les données
-  if (profile && profile.wheelOfLife) {
+  if (profile?.onboardingDone) {
     return {
       completed: true,
       profile,
     };
   }
 
-  // Sinon, retourner le flow d'onboarding
+  // Flow d'onboarding V2 : 6 questions
   return {
     completed: false,
     steps: [
       {
-        id: 'wheel-of-life',
-        title: 'Wheel of Life',
-        description: 'Évalue chaque domaine de ta vie sur une échelle de 1 à 10',
-        domains: [
-          'Santé & Forme physique',
-          'Relations & Amour',
-          'Carrière & Mission',
-          'Finances & Sécurité',
-          'Fun & Loisirs',
-          'Croissance personnelle',
-          'Environnement physique',
-          'Contribution & Impact',
-        ],
+        id: 'q1',
+        zone: 'values',
+        question: 'Pense à un moment récent où tu t\'es senti vraiment vivant. Que faisais-tu ?',
       },
       {
-        id: 'values',
-        title: 'Tes valeurs',
-        description: 'Choisis 5 valeurs qui résonnent le plus avec toi',
-        values: [
-          'Authenticité', 'Liberté', 'Créativité', 'Famille', 'Succès',
-          'Aventure', 'Sécurité', 'Croissance', 'Impact', 'Plaisir',
-          'Indépendance', 'Connexion', 'Excellence', 'Équilibre', 'Courage',
-          'Sagesse', 'Santé', 'Beauté', 'Joie', 'Paix',
-          'Discipline', 'Compassion', 'Innovation', 'Tradition', 'Pouvoir',
-          'Simplicité', 'Diversité', 'Justice', 'Gratitude', 'Curiosité',
-        ],
+        id: 'q2',
+        zone: 'values',
+        question: 'Qu\'est-ce qui te met en colère quand tu le vois dans le monde ?',
       },
       {
-        id: 'vision',
-        title: 'Ta vision',
-        description: 'Réponds à ces 3 questions pour définir ta vision',
-        questions: [
-          'Si tu avais une baguette magique et que tout était possible, qui serais-tu dans 5 ans?',
-          'Quelles sont les 3 choses que tu veux absolument accomplir dans l\'année qui vient?',
-          'Qu\'est-ce qui te donne de l\'énergie et du sens au quotidien?',
-        ],
+        id: 'q3',
+        zone: 'strengths',
+        question: 'Dans quoi les gens viennent-ils te demander de l\'aide ?',
+      },
+      {
+        id: 'q4',
+        zone: 'shadows',
+        question: 'Quel trait de caractère tu sais que tu devrais changer, mais que tu repousses ?',
+      },
+      {
+        id: 'q5',
+        zone: 'chaosOrder',
+        question: 'Face à l\'inconnu, ta première réaction : fuir, réfléchir, ou foncer ?',
+      },
+      {
+        id: 'q6',
+        zone: 'vision',
+        question: 'Imagine-toi dans 5 ans, ta meilleure version. Décris cette scène.',
       },
     ],
   };
