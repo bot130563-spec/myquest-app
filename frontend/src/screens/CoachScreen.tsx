@@ -41,8 +41,9 @@ export default function CoachScreen() {
 
   const checkOnboardingStatus = async () => {
     try {
-      const response = await api.get<ProfileStatus>('/coach/profile');
-      setCurrentView(response.onboardingDone ? 'dashboard' : 'onboarding');
+      const response = await api.get<any>('/coach/profile');
+      const done = response?.profile?.onboardingDone ?? response?.onboardingDone ?? false;
+      setCurrentView(done ? 'dashboard' : 'onboarding');
     } catch (err: any) {
       console.error('Erreur vérification profil coach:', err);
       // Si 404 ou erreur → onboarding
