@@ -413,8 +413,21 @@ router.post('/:id/complete', async (req: Request, res: Response) => {
       });
       
       // 4. Met à jour la stat correspondante
+      // Mapping des catégories vers les champs Stats
+      const categoryToStat: Record<string, string> = {
+        BODY: 'body',
+        MIND: 'mind',
+        WISDOM: 'wisdom',
+        SOCIAL: 'social',
+        LOVE: 'love',
+        CAREER: 'career',
+        FINANCE: 'finance',
+        HEALTH: 'body',    // deprecated → body
+        ENERGY: 'mind',    // deprecated → mind
+        WEALTH: 'finance', // deprecated → finance
+      };
       if (habit.category !== 'GENERAL') {
-        const statField = habit.category.toLowerCase();
+        const statField = categoryToStat[habit.category] || habit.category.toLowerCase();
         const stats = await tx.stats.findUnique({
           where: { userId: req.userId },
         });

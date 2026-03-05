@@ -424,8 +424,21 @@ router.post('/:id/complete', async (req: Request, res: Response) => {
       // 5. Met à jour la stat correspondante (si pas GENERAL)
       let statAffected: string | null = null;
       
+      // Mapping des catégories vers les champs Stats
+      const categoryToStat: Record<string, string> = {
+        BODY: 'body',
+        MIND: 'mind',
+        WISDOM: 'wisdom',
+        SOCIAL: 'social',
+        LOVE: 'love',
+        CAREER: 'career',
+        FINANCE: 'finance',
+        HEALTH: 'body',    // deprecated → body
+        ENERGY: 'mind',    // deprecated → mind
+        WEALTH: 'finance', // deprecated → finance
+      };
       if (quest.category !== 'GENERAL') {
-        const statField = quest.category.toLowerCase();
+        const statField = categoryToStat[quest.category] || quest.category.toLowerCase();
         statAffected = statField;
         
         // Récupère les stats actuelles

@@ -17,14 +17,20 @@ export const HabitFrequency = z.enum([
   'WEEKENDS',   // Sam-Dim
 ]);
 
-// Réutilise QuestCategory
+// Réutilise QuestCategory (nouvelles + anciennes catégories)
 export const HabitCategory = z.enum([
-  'HEALTH',
-  'ENERGY', 
+  'BODY',
+  'MIND',
   'WISDOM',
   'SOCIAL',
-  'WEALTH',
+  'LOVE',
+  'CAREER',
+  'FINANCE',
   'GENERAL',
+  // Anciennes catégories conservées pour compatibilité
+  'HEALTH',
+  'ENERGY',
+  'WEALTH',
 ]);
 
 // ============================================
@@ -163,10 +169,16 @@ export function shouldDoToday(
  * Labels catégories (réutilisé de quest)
  */
 export const categoryLabels: Record<string, string> = {
-  HEALTH: '💪 Santé',
-  ENERGY: '⚡ Énergie',
+  BODY: '💪 Corps',
+  MIND: '🧠 Esprit',
   WISDOM: '📚 Sagesse',
   SOCIAL: '👥 Social',
-  WEALTH: '💰 Finances',
+  LOVE: '❤️ Amour',
+  CAREER: '🎯 Carrière',
+  FINANCE: '💰 Finances',
   GENERAL: '⭐ Général',
+  // Anciennes catégories
+  HEALTH: '💪 Santé',
+  ENERGY: '⚡ Énergie',
+  WEALTH: '💰 Finances',
 };

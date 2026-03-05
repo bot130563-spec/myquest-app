@@ -40,7 +40,7 @@ myquest-app/
 - ✅ Journal (entrées journalières)
 - ✅ Dashboard (vue d'ensemble)
 - ✅ Achievements (badges + XP)
-- ✅ AI Coach (conseils personnalisés)
+- ✅ AI Coach V2 (onboarding, sessions, projets)
 
 ## Features en cours (ne pas refaire)
 - ✅ Streak System (POST /complete + GET /streak + 🔥 UI)
@@ -48,7 +48,7 @@ myquest-app/
 - ✅ Daily Progress bar (GET /dashboard/daily-progress)
 - ✅ Reminder time sur Habits (PATCH /habits/:id/reminder)
 - ✅ Leaderboard (GET /leaderboard + LeaderboardScreen)
-- ✅ Tests Jest backend (24 tests, 4 fichiers)
+- ✅ Tests Jest backend (26 tests, 4 fichiers)
 
 ## Conventions de code
 - TypeScript strict
@@ -60,15 +60,22 @@ myquest-app/
 
 ## Authentification
 - JWT dans header `Authorization: Bearer <token>`
-- Middleware `authenticateToken` dans toutes les routes protégées
-- User ID disponible via `req.user.userId` après auth
+- Middleware `authMiddleware` dans toutes les routes protégées
+- User ID disponible via `req.userId` après auth
 
 ## Modèle de données (Prisma)
-- User: id, email, password, name, totalXp, level
-- Quest: id, userId, title, description, status, dueDate
-- Habit: id, userId, title, frequency, streakCount, lastCompletedAt, reminderTime
-- Journal: id, userId, content, mood, createdAt
-- Achievement: id, userId, type, title, xpReward, unlockedAt
+- User: id, email, password, name, createdAt, updatedAt
+- Avatar: id, userId, name, level, experience, avatarType, appearance
+- Stats: id, userId, body, mind, wisdom, social, love, career, finance, currentStreak, longestStreak
+- Quest: id, userId, title, description, category, difficulty, status, dueDate
+- Habit: id, userId, title, frequency, currentStreak, longestStreak, totalCompletions, reminderTime
+- HabitLog: id, habitId, completedDate
+- JournalEntry: id, userId, entryDate, mood, content, gratitudes
+- UserAchievement: id, userId, achievementId, unlockedAt
+- CoachProfile: id, userId, values, strengths, shadows, chaosOrder, vision, summary
+- CoachSession: id, userId, status, phase, topic, messages[]
+- CoachMessage: id, sessionId, role, content, insightScore
+- CoachProjectProposal: id, userId, title, description, type, status
 
 ## Règles importantes
 - Ne jamais commit de secrets/clés API en dur

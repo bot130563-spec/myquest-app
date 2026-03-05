@@ -13,12 +13,18 @@ import { z } from 'zod';
 // ============================================
 
 export const QuestCategory = z.enum([
-  'HEALTH',   // 💪 Santé
-  'ENERGY',   // ⚡ Énergie
+  'BODY',     // 💪 Corps
+  'MIND',     // 🧠 Esprit
   'WISDOM',   // 📚 Sagesse
   'SOCIAL',   // 👥 Social
-  'WEALTH',   // 💰 Finances
+  'LOVE',     // ❤️ Amour
+  'CAREER',   // 🎯 Carrière
+  'FINANCE',  // 💰 Finances
   'GENERAL',  // ⭐ Général
+  // Anciennes catégories conservées pour compatibilité
+  'HEALTH',
+  'ENERGY',
+  'WEALTH',
 ]);
 
 export const QuestDifficulty = z.enum([
@@ -126,12 +132,18 @@ export function getRewardsByDifficulty(difficulty: string): { xp: number; statBo
  * Labels français pour les catégories
  */
 export const categoryLabels: Record<string, string> = {
-  HEALTH: '💪 Santé',
-  ENERGY: '⚡ Énergie',
+  BODY: '💪 Corps',
+  MIND: '🧠 Esprit',
   WISDOM: '📚 Sagesse',
   SOCIAL: '👥 Social',
-  WEALTH: '💰 Finances',
+  LOVE: '❤️ Amour',
+  CAREER: '🎯 Carrière',
+  FINANCE: '💰 Finances',
   GENERAL: '⭐ Général',
+  // Anciennes catégories
+  HEALTH: '💪 Santé',
+  ENERGY: '⚡ Énergie',
+  WEALTH: '💰 Finances',
 };
 
 /**

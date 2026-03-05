@@ -21,7 +21,7 @@ jest.mock('../config/database', () => ({
 }));
 
 // Mock de l'app Express
-import app from '../index';
+import app from '../app';
 import { prisma } from '../config/database';
 
 describe('Auth Routes', () => {

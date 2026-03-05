@@ -17,7 +17,7 @@ jest.mock('../config/database', () => ({
   disconnectDatabase: jest.fn().mockResolvedValue(undefined),
 }));
 
-import app from '../index';
+import app from '../app';
 import { prisma } from '../config/database';
 
 describe('Leaderboard Routes', () => {
